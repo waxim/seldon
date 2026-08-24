@@ -1,0 +1,35 @@
+id: party-register
+name: Register of Political Parties
+group: parties
+description: >-
+  The Electoral Commission's register of political parties in Great Britain
+  and Northern Ireland — registration ids, official names, types, and
+  statuses. Validates and extends the canonical list in @seldon/parties.
+publisher: Electoral Commission
+licence: OGL-3.0
+homepage: https://www.electoralcommission.org.uk/political-registers-and-financial-data/registers-political-parties
+status: ready
+normalised: true
+ingest:
+  apiSource: parties
+fetch:
+  url: https://search.electoralcommission.org.uk/api/csv/Registrations?start=0&rows=2000&query=&sort=RegulatedEntityName&order=asc&et=pp&et=ppm
+  format: csv
+  release: latest
+process:
+  - kind: csv-select
+    columns: [ECRef, RegulatedEntityName, RegulatedEntityTypeName, RegistrationStatusName, RegisterName, ApprovedDate]
+  - kind: csv-rename
+    columns:
+      ECRef: id
+      RegulatedEntityName: name
+      RegulatedEntityTypeName: type
+      RegistrationStatusName: status
+      RegisterName: register
+      ApprovedDate: registered_date
+output:
+  processed: party-register.csv
+notes: >-
+  Electoral Commission registrations CSV export — every registered and
+  deregistered party (~1,700 rows). ECRef (PP-prefixed) is the join key to the
+  EC finance datasets and to democracy-club-parties.

@@ -1,0 +1,25 @@
+id: ge-results-historical
+name: Historical General Election Results 1918-2019
+group: results
+description: >-
+  Long-run series of UK general election results by constituency for all 28
+  general elections from 1918 to 2019. Reference data for validating model
+  behaviour over time.
+publisher: House of Commons Library
+licence: OGL-3.0
+homepage: https://commonslibrary.parliament.uk/research-briefings/cbp-8647/
+status: ready
+normalised: false
+fetch:
+  url: https://researchbriefings.files.parliament.uk/documents/CBP-8647/1918-2019election_results.csv
+  format: csv
+  release: cbp-8647
+process: []
+output:
+  processed: 1918-2019election_results.csv
+notes: >-
+  House of Commons Library briefing CBP-8647 — one row per constituency per
+  election, with four party buckets (Con / Lib / Lab / nationalist / Other).
+  A few source headers carry trailing spaces. The host
+  researchbriefings.files.parliament.uk may block automated downloads; if the
+  fetch 403s, place the file manually in data/raw/ge-results-historical/.

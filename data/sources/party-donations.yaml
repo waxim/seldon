@@ -1,0 +1,32 @@
+id: party-donations
+name: Political Party Donations
+group: financial
+description: >-
+  Reported donations to political parties from the Electoral Commission's
+  political finance database. Context for campaign resourcing.
+publisher: Electoral Commission
+licence: OGL-3.0
+homepage: https://search.electoralcommission.org.uk/Search/Donations
+status: ready
+normalised: false
+fetch:
+  url: https://search.electoralcommission.org.uk/api/csv/Donations?start=0&rows=100000&query=&sort=AcceptedDate&order=desc&et=pp
+  format: csv
+  release: latest
+process:
+  - kind: csv-select
+    columns: [ECRef, RegulatedEntityName, Value, AcceptedDate, DonorName, DonorStatus, DonationType, NatureOfDonation, ReportingPeriodName, RegisterName]
+  - kind: csv-rename
+    columns:
+      ECRef: id
+      RegulatedEntityName: party
+      Value: value
+      AcceptedDate: accepted_date
+      DonorName: donor
+      DonorStatus: donor_status
+output:
+  processed: party-donations.csv
+notes: >-
+  Electoral Commission donations CSV export (~80,000 rows). `value` is a
+  formatted "£x,xxx.xx" string. et=pp restricts the export to political
+  parties; drop it to include other registered campaigners.

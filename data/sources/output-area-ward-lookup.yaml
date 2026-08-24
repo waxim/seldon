@@ -1,0 +1,33 @@
+id: output-area-ward-lookup
+name: Output Area to Ward and Local Authority Lookup
+group: geography
+description: >-
+  Best-fit lookup from 2021 census Output Areas to 2024 electoral wards and
+  local authority districts. Bridges census Output Area marginals onto the
+  ward layer the synthetic electorate is built per.
+publisher: Office for National Statistics
+licence: OGL-3.0
+homepage: https://geoportal.statistics.gov.uk/
+status: ready
+normalised: true
+ingest:
+  apiSource: census-2021
+fetch:
+  url: https://opendata.arcgis.com/api/v3/datasets/b21c632804094c149ccdfea1ae59c8c8_0/downloads/data?format=csv&spatialRefId=4326
+  format: csv
+  release: may-2024
+process:
+  - kind: csv-select
+    columns: [OA21CD, WD24CD, WD24NM, LAD24CD, LAD24NM]
+  - kind: csv-rename
+    columns:
+      OA21CD: oa_id
+      WD24CD: ward_id
+      WD24NM: ward_name
+      LAD24CD: council_id
+      LAD24NM: council_name
+output:
+  processed: output-area-ward-lookup.csv
+notes: >-
+  ONS "Output Area (2021) to Ward (2024) to LAD (May 2024) Best Fit Lookup in
+  EW". Best-fit: each Output Area is assigned wholly to one ward.

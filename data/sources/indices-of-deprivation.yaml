@@ -1,0 +1,25 @@
+id: indices-of-deprivation
+name: English Indices of Multiple Deprivation
+group: economic
+description: >-
+  Small-area deprivation scores, ranks, and deciles for England (income,
+  employment, education, health, crime, and more) — a strong economic
+  covariate for the demographic model.
+publisher: Ministry of Housing, Communities and Local Government
+licence: OGL-3.0
+homepage: https://www.gov.uk/government/statistics/english-indices-of-deprivation-2019
+status: ready
+normalised: false
+fetch:
+  url: https://assets.publishing.service.gov.uk/media/5dc407b440f0b6379a7acc8d/File_7_-_All_IoD2019_Scores__Ranks__Deciles_and_Population_Denominators_3.csv
+  format: csv
+  release: imd-2019
+process: []
+output:
+  processed: File_7_-_All_IoD2019_Scores__Ranks__Deciles_and_Population_Denominators_3.csv
+notes: >-
+  English Indices of Deprivation 2019, File 7 (all scores, ranks, deciles and
+  population denominators), keyed on 2011 LSOA codes. England only — see
+  welsh-index-of-deprivation, scottish-index-of-deprivation, and
+  ni-deprivation-measure for the devolved nations, which use different
+  methodologies and are not directly comparable.

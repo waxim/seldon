@@ -1,0 +1,7 @@
+# Raw and processed source data is not tracked — only the YAML definitions
+# under sources/ are committed. Everything fetched (raw/, processed/) and the
+# per-source state (.state/) stays local.
+*
+!.gitignore
+!sources/
+!sources/**

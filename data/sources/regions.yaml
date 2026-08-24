@@ -1,0 +1,29 @@
+id: regions
+name: English Regions
+group: geography
+description: >-
+  The nine statistical regions of England, with GSS codes and names. Mostly
+  static reference data — also mirrored in the @seldon/geo package, which
+  additionally treats Scotland, Wales, and Northern Ireland as regions.
+publisher: Office for National Statistics
+licence: OGL-3.0
+homepage: https://geoportal.statistics.gov.uk/
+status: ready
+normalised: false
+fetch:
+  url: https://opendata.arcgis.com/api/v3/datasets/3bd7094648854539a31cabdf3165ba32_0/downloads/data?format=csv&spatialRefId=4326
+  format: csv
+  release: december-2024
+process:
+  - kind: csv-select
+    columns: [RGN24CD, RGN24NM]
+  - kind: csv-rename
+    columns:
+      RGN24CD: id
+      RGN24NM: name
+output:
+  processed: regions.csv
+notes: >-
+  ONS "Regions (December 2024) Names and Codes in EN" — the nine English
+  regions only. @seldon/geo extends this to twelve modelling regions by
+  adding Scotland, Wales, and Northern Ireland as top-level entries.

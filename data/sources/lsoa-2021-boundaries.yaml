@@ -1,0 +1,24 @@
+id: lsoa-2021-boundaries
+name: 2021 LSOA Boundaries
+group: geography
+description: >-
+  Boundary geometry for 2021 Lower Layer Super Output Areas in England and
+  Wales — used for small-area spatial joins, including resolving census
+  Output Areas in wards split across constituencies.
+publisher: Office for National Statistics
+licence: OGL-3.0
+homepage: https://geoportal.statistics.gov.uk/
+status: ready
+normalised: false
+fetch:
+  url: https://hub.arcgis.com/api/download/v1/items/68515293204e43ca8ab56fa13ae8a547/geojson?layers=0
+  format: geojson
+  release: december-2021-bgc
+process: []
+output:
+  processed: lsoa-2021-boundaries.geojson
+notes: >-
+  ONS "Lower layer Super Output Areas (December 2021) Boundaries EW BGC"
+  (generalised, clipped). LSOA21CD joins to output-area-lookup. The ArcGIS Hub
+  endpoint generates the export on demand; the fetcher retries past the
+  placeholder response.

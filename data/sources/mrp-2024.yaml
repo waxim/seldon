@@ -1,0 +1,27 @@
+id: mrp-2024
+name: 2024 MRP Estimates (Survation)
+group: electoral
+description: >-
+  Published constituency-level MRP (multilevel regression with
+  poststratification) estimates from Survation's final 2024 general election
+  campaign model. Used to calibrate the SHARP model.
+publisher: Survation
+licence: OGL-3.0
+homepage: https://www.survation.com/
+status: ready
+normalised: true
+ingest:
+  apiSource: mrp-calibration
+fetch:
+  url: https://cdn.survation.com/wp-content/uploads/2024/06/04175821/B4B_MRP_20240603.xlsx
+  format: xlsx
+  release: "2024-06-03"
+process: []
+output:
+  processed: B4B_MRP_20240603.xlsx
+notes: >-
+  Survation "Britain for Britain" MRP, fieldwork 22 May to 2 June 2024
+  (n=30,044). The workbook is left unconverted — add an xlsx-extract step
+  naming the estimate sheet once its layout is confirmed. YouGov, More in
+  Common, and Focaldata published 2024 MRPs only as interactive tables with
+  no stable file URL.

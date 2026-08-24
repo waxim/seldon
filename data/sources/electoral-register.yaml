@@ -1,0 +1,28 @@
+id: electoral-register
+name: Electoral Statistics — Registered Electorate
+group: electoral
+description: >-
+  Registered parliamentary electorate counts per constituency from the ONS
+  electoral statistics release. Calibrates turnout against eligible voters.
+publisher: Office for National Statistics
+licence: OGL-3.0
+homepage: https://www.ons.gov.uk/peoplepopulationandcommunity/elections/electoralregistration
+status: ready
+normalised: true
+ingest:
+  apiSource: electoral-register
+fetch:
+  url: https://www.ons.gov.uk/file?uri=/peoplepopulationandcommunity/elections/electoralregistration/datasets/electoralstatisticsforuk/december2025/offsenelectoralregistrationstatistics2025.xlsx
+  format: xlsx
+  release: december-2025
+process:
+  - kind: xlsx-extract
+    sheet: "Table 1"
+    to: electoral-statistics-2025.csv
+output:
+  processed: electoral-statistics-2025.csv
+notes: >-
+  ONS "Electoral statistics for the UK", December 2025 edition. This release
+  carries Westminster constituency electorate only — local-authority figures
+  were withdrawn for data quality and are expected back in December 2026. If
+  the extracted CSV has stray banner rows above the header, raise skipRows.

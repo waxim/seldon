@@ -1,0 +1,34 @@
+id: output-area-lookup
+name: Output Area to LSOA, MSOA and Local Authority Lookup
+group: geography
+description: >-
+  Exact-fit lookup from 2021 census Output Areas up to LSOAs, MSOAs, and local
+  authority districts. Bridges census small-area tables onto wider geography.
+publisher: Office for National Statistics
+licence: OGL-3.0
+homepage: https://geoportal.statistics.gov.uk/
+status: ready
+normalised: true
+ingest:
+  apiSource: census-2021
+fetch:
+  url: https://opendata.arcgis.com/api/v3/datasets/b9ca90c10aaa4b8d9791e9859a38ca67_0/downloads/data?format=csv&spatialRefId=4326
+  format: csv
+  release: december-2021
+process:
+  - kind: csv-select
+    columns: [OA21CD, LSOA21CD, LSOA21NM, MSOA21CD, MSOA21NM, LAD22CD, LAD22NM]
+  - kind: csv-rename
+    columns:
+      OA21CD: oa_id
+      LSOA21CD: lsoa_id
+      LSOA21NM: lsoa_name
+      MSOA21CD: msoa_id
+      MSOA21NM: msoa_name
+      LAD22CD: council_id
+      LAD22NM: council_name
+output:
+  processed: output-area-lookup.csv
+notes: >-
+  ONS "Output Area (2021) to LSOA to MSOA to LAD (December 2021) Exact Fit
+  Lookup in EW". Pair with output-area-ward-lookup to reach the ward layer.

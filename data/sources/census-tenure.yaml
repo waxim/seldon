@@ -1,0 +1,28 @@
+id: census-tenure
+name: 2021 Census — Household Tenure
+group: demographic
+description: >-
+  Households by tenure (owned outright, owned with a mortgage, social rent,
+  private rent, and other) per Output Area from the 2021 Census of England and
+  Wales (table TS054).
+publisher: Office for National Statistics
+licence: OGL-3.0
+homepage: https://www.nomisweb.co.uk/sources/census_2021_bulk
+status: ready
+normalised: true
+ingest:
+  apiSource: census-2021
+fetch:
+  url: https://www.nomisweb.co.uk/output/census/2021/census2021-ts054.zip
+  format: zip
+  release: census-2021
+process:
+  - kind: unzip
+    member: census2021-ts054-oa.csv
+    to: census-tenure-oa.csv
+output:
+  processed: census-tenure-oa.csv
+notes: >-
+  ONS 2021 Census bulk table TS054. The ingest loader collapses the source
+  categories onto the tenure enum (owned-outright, mortgaged, social-rent,
+  private-rent, other).

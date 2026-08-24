@@ -1,0 +1,28 @@
+id: democracy-club-parties
+name: Democracy Club Party Data
+group: parties
+description: >-
+  Party data from Democracy Club — registration ids, names, registers, and
+  emblem (logo) image URLs for every UK party. The canonical source of party
+  logos for the model.
+publisher: Democracy Club
+licence: CC-BY-4.0
+homepage: https://candidates.democracyclub.org.uk/
+status: ready
+normalised: true
+ingest:
+  apiSource: parties
+fetch:
+  url: https://candidates.democracyclub.org.uk/api/next/parties/?format=json&page_size=200
+  format: json
+  release: latest
+process:
+  - kind: custom
+    processor: democracy-club-parties
+output:
+  processed: parties.json
+notes: >-
+  Democracy Club's paginated parties API. fetch retrieves the first page; the
+  democracy-club-parties custom processor walks the remaining pages and writes
+  the combined list. Each party carries a default_emblem.image URL — the
+  source of party logos — and an ec_id that joins to party-register.

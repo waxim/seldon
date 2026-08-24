@@ -1,0 +1,34 @@
+id: democracy-club-candidates
+name: Democracy Club Candidates
+group: results
+description: >-
+  Candidate and result records from Democracy Club for UK elections — one row
+  per candidacy, with party, votes, and elected flag. Scoped here to the 2024
+  general election.
+publisher: Democracy Club
+licence: CC-BY-4.0
+homepage: https://candidates.democracyclub.org.uk/data/
+status: ready
+normalised: true
+ingest:
+  apiSource: candidates
+fetch:
+  url: https://candidates.democracyclub.org.uk/data/export_csv/?election_date=2024-07-04&election_id=%5Eparl.*&format=csv&field_group=results
+  format: csv
+  release: ge-2024
+process:
+  - kind: csv-select
+    columns: [person_id, person_name, election_id, ballot_paper_id, election_date, party_name, party_id, post_label, votes_cast, elected, rank]
+  - kind: csv-rename
+    columns:
+      person_id: candidate_id
+      person_name: candidate
+      party_id: party
+      post_label: area
+output:
+  processed: democracy-club-candidates.csv
+notes: >-
+  Democracy Club bulk CSV export, scoped to the 2024 general election
+  (election_id ^parl.*). Widen the query by changing election_date /
+  election_id — drop election_date for every election. party_id is the
+  Electoral Commission PP-code.

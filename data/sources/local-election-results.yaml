@@ -1,0 +1,32 @@
+id: local-election-results
+name: Local Election Results
+group: results
+description: >-
+  Results of UK local council elections from Democracy Club — one row per
+  candidacy per ward, with party, votes, elected flag, and turnout.
+publisher: Democracy Club
+licence: CC-BY-4.0
+homepage: https://candidates.democracyclub.org.uk/data/
+status: ready
+normalised: true
+ingest:
+  apiSource: local-results
+fetch:
+  url: https://candidates.democracyclub.org.uk/data/export_csv/?election_id=%5Elocal.*&format=csv&field_group=results
+  format: csv
+  release: latest
+process:
+  - kind: csv-select
+    columns: [election_id, ballot_paper_id, election_date, post_label, person_name, party_name, party_id, votes_cast, elected, rank, total_electorate, turnout_percentage]
+  - kind: csv-rename
+    columns:
+      post_label: ward
+      person_name: candidate
+      party_id: party
+      votes_cast: votes
+output:
+  processed: local-election-results.csv
+notes: >-
+  Democracy Club bulk CSV export of all local (council) elections since 2016.
+  party_id is the Electoral Commission PP-code. Andrew Teale's Local Elections
+  Archive Project (andrewteale.me.uk) is an alternative for pre-2016 results.

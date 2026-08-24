@@ -1,0 +1,25 @@
+id: house-prices
+name: House Price Statistics for Small Areas
+group: economic
+description: >-
+  Median residential property prices per LSOA (ONS HPSSA dataset 46) — a proxy
+  for local wealth feeding the demographic model.
+publisher: Office for National Statistics
+licence: OGL-3.0
+homepage: https://www.ons.gov.uk/peoplepopulationandcommunity/housing/datasets/medianpricepaidbylowerlayersuperoutputareahpssadataset46
+status: ready
+normalised: false
+fetch:
+  url: https://www.ons.gov.uk/file?uri=/peoplepopulationandcommunity/housing/datasets/medianpricepaidbylowerlayersuperoutputareahpssadataset46/current/hpssadataset46medianpricepaidforresidentialpropertiesbylsoa.zip
+  format: zip
+  release: current
+process:
+  - kind: unzip
+    member: "HPSSA Dataset 46*.xls"
+    to: house-prices-lsoa.xls
+output:
+  processed: house-prices-lsoa.xls
+notes: >-
+  ONS House Price Statistics for Small Areas, dataset 46 (median price paid by
+  LSOA). The zip holds a single legacy .xls workbook; converting it to CSV
+  needs a custom processor — the xlsx-extract step reads OOXML .xlsx only.

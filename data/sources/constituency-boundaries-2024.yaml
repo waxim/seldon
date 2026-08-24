@@ -1,0 +1,26 @@
+id: constituency-boundaries-2024
+name: 2024 Westminster Constituency Boundaries
+group: geography
+description: >-
+  Boundary geometry (GeoJSON) for the 650 Westminster parliamentary
+  constituencies contested at the 2024 general election. PostGIS-loaded into
+  psephos-api to attach a polygon to every constituency.
+publisher: Office for National Statistics
+licence: OGL-3.0
+homepage: https://geoportal.statistics.gov.uk/
+status: ready
+normalised: true
+ingest:
+  apiSource: boundaries-2024
+fetch:
+  url: https://hub.arcgis.com/api/download/v1/items/b49f0eeb2ce540f394831ba3a514d86e/geojson?layers=0
+  format: geojson
+  release: july-2024-bgc
+process: []
+output:
+  processed: constituency-boundaries-2024.geojson
+notes: >-
+  ONS "Westminster Parliamentary Constituencies (July 2024) Boundaries UK BGC"
+  (generalised, clipped). Feature property PCON24CD joins to
+  constituencies-2024. The ArcGIS Hub endpoint builds the export on demand;
+  the fetcher waits out the "being generated" placeholder.

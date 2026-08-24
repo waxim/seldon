@@ -1,0 +1,26 @@
+id: wards-2024
+name: 2024 Electoral Ward Boundaries
+group: geography
+description: >-
+  Boundary geometry and GSS codes for the ~8,400 UK electoral wards — the
+  sub-constituency unit the synthetic electorate is built per. PostGIS-loaded
+  into psephos-api.
+publisher: Office for National Statistics
+licence: OGL-3.0
+homepage: https://geoportal.statistics.gov.uk/
+status: ready
+normalised: true
+ingest:
+  apiSource: boundaries-2024
+fetch:
+  url: https://hub.arcgis.com/api/download/v1/items/91a1b096076843838f4341cf7dd6d14d/geojson?layers=0
+  format: geojson
+  release: december-2024-bgc
+process: []
+output:
+  processed: wards-2024.geojson
+notes: >-
+  ONS "Wards (December 2024) Boundaries UK BGC" (generalised, clipped).
+  Feature properties include WD24CD, WD24NM, and LAD24CD. The ArcGIS Hub
+  endpoint builds the export on demand; the fetcher waits out the
+  "being generated" placeholder response.

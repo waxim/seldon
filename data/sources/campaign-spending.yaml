@@ -1,0 +1,32 @@
+id: campaign-spending
+name: Campaign Spending Returns
+group: financial
+description: >-
+  Party campaign spending returns from the Electoral Commission — how much was
+  spent contesting each election, by category and nation.
+publisher: Electoral Commission
+licence: OGL-3.0
+homepage: https://search.electoralcommission.org.uk/Search/Spending
+status: ready
+normalised: false
+fetch:
+  url: https://search.electoralcommission.org.uk/api/csv/Spending?start=0&rows=200000&query=&sort=TotalExpenditure&order=desc&et=pp
+  format: csv
+  release: latest
+process:
+  - kind: csv-select
+    columns: [ECRef, RegulatedEntityName, ReportingPeriodName, TotalExpenditure, DateIncurred, ExpenseCategoryName, SupplierName, AmountInEngland, AmountInScotland, AmountInWales, AmountInNorthernIreland]
+  - kind: csv-rename
+    columns:
+      ECRef: id
+      RegulatedEntityName: party
+      ReportingPeriodName: period
+      ExpenseCategoryName: category
+      SupplierName: supplier
+output:
+  processed: campaign-spending.csv
+notes: >-
+  Electoral Commission campaign-spending CSV export (~108,000 rows).
+  ReportingPeriodName ties each return to a named election. This is
+  party-level spending; candidate-level returns are held by local Returning
+  Officers and are not in this feed.

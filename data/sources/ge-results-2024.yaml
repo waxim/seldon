@@ -1,0 +1,28 @@
+id: ge-results-2024
+name: 2024 General Election Results
+group: results
+description: >-
+  Constituency-level results of the 2024 UK general election — one row per
+  candidacy, with votes, vote share, and result. The most recent baseline for
+  swing analysis.
+publisher: UK Parliament
+licence: OGL-3.0
+homepage: https://electionresults.parliament.uk/general-elections/6
+status: ready
+normalised: true
+ingest:
+  apiSource: historical-results
+fetch:
+  url: https://electionresults.parliament.uk/general-elections/6/candidacies.csv
+  format: csv
+  release: ge-2024
+process: []
+output:
+  processed: candidacies.csv
+notes: >-
+  UK Parliament election results service, general election id 6 (4 July
+  2024). Long format — one row per candidate per seat — keyed on the 2024 ONS
+  constituency codes, so it joins directly to constituencies-2024. The House
+  of Commons Library wide-format equivalent lives at
+  researchbriefings.files.parliament.uk/documents/CBP-10009/, but that host
+  blocks automated downloads.

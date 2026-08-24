@@ -1,0 +1,25 @@
+id: population-estimates
+name: Mid-Year Population Estimates
+group: demographic
+description: >-
+  ONS mid-year LSOA population estimates by single year of age and sex, used
+  to age the 2021 Census marginals forward to the modelled election year.
+publisher: Office for National Statistics
+licence: OGL-3.0
+homepage: https://www.ons.gov.uk/peoplepopulationandcommunity/populationandmigration/populationestimates/datasets/lowersuperoutputareamidyearpopulationestimates
+status: ready
+normalised: true
+ingest:
+  apiSource: census-2021
+fetch:
+  url: https://www.ons.gov.uk/file?uri=/peoplepopulationandcommunity/populationandmigration/populationestimates/datasets/lowersuperoutputareamidyearpopulationestimates/mid2022revisednov2025tomid2024/sapelsoasyoa20222024.xlsx
+  format: xlsx
+  release: mid-2022-to-mid-2024
+process: []
+output:
+  processed: population-estimates.xlsx
+notes: >-
+  ONS small-area population estimates, mid-2022 to mid-2024 edition. Left
+  unconverted — at roughly 80 MB this workbook is too large for the
+  xlsx-extract step, so the ingest loader reads it directly. The release
+  segment of the URL changes when ONS republishes; bump it then.

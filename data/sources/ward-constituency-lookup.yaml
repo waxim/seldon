@@ -1,0 +1,36 @@
+id: ward-constituency-lookup
+name: Ward to Westminster Constituency Lookup
+group: geography
+description: >-
+  Lookup mapping each 2024 electoral ward to its 2024 Westminster
+  constituency and local authority, so ward-level demographics tally up to
+  seats.
+publisher: Office for National Statistics
+licence: OGL-3.0
+homepage: https://geoportal.statistics.gov.uk/
+status: ready
+normalised: true
+ingest:
+  apiSource: boundaries-2024
+fetch:
+  url: https://opendata.arcgis.com/api/v3/datasets/62eb9df29a2f4521b5076a419ff9a47e_0/downloads/data?format=csv&spatialRefId=4326
+  format: csv
+  release: july-2024
+process:
+  - kind: csv-select
+    columns: [WD24CD, WD24NM, PCON24CD, PCON24NM, LAD24CD, LAD24NM, SPLIT_WARD]
+  - kind: csv-rename
+    columns:
+      WD24CD: ward_id
+      WD24NM: ward_name
+      PCON24CD: constituency_id
+      PCON24NM: constituency_name
+      LAD24CD: council_id
+      LAD24NM: council_name
+      SPLIT_WARD: split_ward
+output:
+  processed: ward-constituency-lookup.csv
+notes: >-
+  ONS "Ward to Westminster Parliamentary Constituency to LAD to UTLA (July
+  2024) Lookup". split_ward=1 marks wards divided across constituencies — the
+  synthesiser apportions their population.

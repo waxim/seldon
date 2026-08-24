@@ -1,0 +1,27 @@
+id: census-qualifications
+name: 2021 Census — Highest Qualification
+group: demographic
+description: >-
+  Population by highest level of qualification per Output Area from the 2021
+  Census of England and Wales (table TS067) — an input to the per-person
+  attributes.
+publisher: Office for National Statistics
+licence: OGL-3.0
+homepage: https://www.nomisweb.co.uk/sources/census_2021_bulk
+status: ready
+normalised: true
+ingest:
+  apiSource: census-2021
+fetch:
+  url: https://www.nomisweb.co.uk/output/census/2021/census2021-ts067.zip
+  format: zip
+  release: census-2021
+process:
+  - kind: unzip
+    member: census2021-ts067-oa.csv
+    to: census-qualifications-oa.csv
+output:
+  processed: census-qualifications-oa.csv
+notes: >-
+  ONS 2021 Census bulk table TS067 — no qualifications through level 4+, plus
+  apprenticeships and other qualifications. The Output Area CSV is extracted.

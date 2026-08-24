@@ -1,0 +1,27 @@
+id: census-ethnicity
+name: 2021 Census — Ethnic Group
+group: demographic
+description: >-
+  Population by ethnic group per Output Area from the 2021 Census of England
+  and Wales (table TS021) — a marginal used when conditioning party
+  preference.
+publisher: Office for National Statistics
+licence: OGL-3.0
+homepage: https://www.nomisweb.co.uk/sources/census_2021_bulk
+status: ready
+normalised: true
+ingest:
+  apiSource: census-2021
+fetch:
+  url: https://www.nomisweb.co.uk/output/census/2021/census2021-ts021.zip
+  format: zip
+  release: census-2021
+process:
+  - kind: unzip
+    member: census2021-ts021-oa.csv
+    to: census-ethnicity-oa.csv
+output:
+  processed: census-ethnicity-oa.csv
+notes: >-
+  ONS 2021 Census bulk table TS021 — five high-level ethnic groups each with
+  a detailed breakdown. The Output Area CSV is extracted.

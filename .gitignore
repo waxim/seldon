@@ -1,0 +1,32 @@
+# dependencies
+node_modules/
+
+# build output
+dist/
+*.tsbuildinfo
+
+# v2 data layer (generated; manifests + MANIFEST.lock are committed)
+data/raw/
+data/staged/
+data/population/
+data/runs/
+data/reports/
+*.duckdb
+*.duckdb.wal
+
+# env
+.env
+.env.local
+.env.*.local
+
+# logs
+*.log
+
+# coverage
+coverage/
+
+# editor / OS
+.DS_Store
+.idea/
+.vscode/*
+!.vscode/extensions.json

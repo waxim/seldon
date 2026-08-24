@@ -1,0 +1,26 @@
+id: ge-2019-notional-results
+name: 2019 Notional Results on 2024 Boundaries
+group: results
+description: >-
+  Notional 2019 general election results recomputed onto the 2024
+  constituency boundaries (the Rallings & Thrasher estimates). The like-for-
+  like prior the model swings from.
+publisher: UK Parliament
+licence: OGL-3.0
+homepage: https://electionresults.parliament.uk/general-elections/5
+status: ready
+normalised: true
+ingest:
+  apiSource: historical-results
+fetch:
+  url: https://electionresults.parliament.uk/general-elections/5/candidacies.csv
+  format: csv
+  release: ge-2019-notional
+process: []
+output:
+  processed: candidacies.csv
+notes: >-
+  UK Parliament election results service, general election id 5 — the
+  notional 2019 result. Long format, keyed on the 2024 ONS constituency
+  codes, so it joins directly to constituencies-2024 and ge-results-2024 for
+  swing analysis.

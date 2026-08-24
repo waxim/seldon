@@ -1,0 +1,24 @@
+id: by-elections
+name: By-elections in the 2024 Parliament
+group: results
+description: >-
+  Results of UK parliamentary by-elections held during the 2024 Parliament —
+  candidates, parties, vote share, and turnout. A signal of swing between
+  general elections.
+publisher: House of Commons Library
+licence: OGL-3.0
+homepage: https://commonslibrary.parliament.uk/research-briefings/cbp-10268/
+status: ready
+normalised: false
+fetch:
+  url: https://researchbriefings.files.parliament.uk/documents/CBP-10268/Results-and-candidates-summary.xlsx
+  format: xlsx
+  release: cbp-10268
+process: []
+output:
+  processed: Results-and-candidates-summary.xlsx
+notes: >-
+  House of Commons Library briefing CBP-10268. Covers the current (2024)
+  Parliament only; the UK Parliament election results service holds
+  per-election CSVs for by-elections back to 2010. The host
+  researchbriefings.files.parliament.uk may block automated downloads.

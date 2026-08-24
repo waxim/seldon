@@ -1,0 +1,26 @@
+id: ge-results-2019
+name: 2019 General Election Results
+group: results
+description: >-
+  Constituency-level results of the 2019 UK general election on the pre-2024
+  boundaries — one row per candidacy. Use ge-2019-notional-results for a
+  like-for-like comparison against the 2024 seats.
+publisher: UK Parliament
+licence: OGL-3.0
+homepage: https://electionresults.parliament.uk/general-elections/4
+status: ready
+normalised: true
+ingest:
+  apiSource: historical-results
+fetch:
+  url: https://electionresults.parliament.uk/general-elections/4/candidacies.csv
+  format: csv
+  release: ge-2019
+process: []
+output:
+  processed: candidacies.csv
+notes: >-
+  UK Parliament election results service, general election id 4 (12 December
+  2019). These results sit on the pre-2024 constituency boundaries and do not
+  join directly to constituencies-2024 — ge-2019-notional-results carries the
+  2019 vote recomputed onto the 2024 seats.

@@ -1,0 +1,30 @@
+id: constituencies-2024
+name: 2024 Westminster Parliamentary Constituencies
+group: geography
+description: >-
+  Code, name, nation, region, electorate, and type for the 650 Westminster
+  constituencies contested at the 2024 general election (the 2023 boundary
+  review seats). The base geography every other dataset attaches to.
+publisher: mySociety
+licence: CC-BY-4.0
+homepage: https://pages.mysociety.org/2025-constituencies/
+status: ready
+normalised: true
+ingest:
+  apiSource: boundaries-2024
+fetch:
+  url: https://pages.mysociety.org/2025-constituencies/data/parliament_con_2025/latest/parl_constituencies_2025.csv
+  format: csv
+  release: latest
+process:
+  - kind: csv-select
+    columns: [gss_code, name, nation, region, electorate, con_type]
+  - kind: csv-rename
+    columns:
+      gss_code: id
+      con_type: type
+output:
+  processed: parl_constituencies_2025.csv
+notes: >-
+  mySociety labels the post-2023-review seats "2025"; these are the same
+  constituencies used at the 2024 general election.

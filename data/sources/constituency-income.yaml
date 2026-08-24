@@ -1,0 +1,27 @@
+id: constituency-income
+name: Small Area Income Estimates
+group: economic
+description: >-
+  Modelled household income estimates per MSOA from the ONS small area income
+  estimates — an economic covariate for resolving party preference, rolled up
+  to constituencies via the area lookups.
+publisher: Office for National Statistics
+licence: OGL-3.0
+homepage: https://www.ons.gov.uk/employmentandlabourmarket/peopleinwork/earningsandworkinghours/datasets/smallareaincomeestimatesformiddlelayersuperoutputareasenglandandwales
+status: ready
+normalised: false
+fetch:
+  url: https://www.ons.gov.uk/file?uri=/employmentandlabourmarket/peopleinwork/earningsandworkinghours/datasets/smallareaincomeestimatesformiddlelayersuperoutputareasenglandandwales/financialyearending2023/datasetfinal.xlsx
+  format: xlsx
+  release: fye-2023
+process:
+  - kind: xlsx-extract
+    sheet: "Total annual income"
+    to: constituency-income.csv
+output:
+  processed: constituency-income.csv
+notes: >-
+  ONS "Income estimates for small areas, England and Wales", financial year
+  ending 2023. Estimates are MSOA-level — there is no constituency-keyed ONS
+  income product, so aggregate via output-area-lookup. The workbook also holds
+  net-income sheets; raise skipRows if the extracted CSV has banner rows.

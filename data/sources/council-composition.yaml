@@ -1,0 +1,28 @@
+id: council-composition
+name: Council Political Composition
+group: results
+description: >-
+  Seat counts by party and overall political control for UK local
+  authorities, 2016 onwards — context on the local political landscape.
+publisher: Open Council Data UK
+licence: CC-BY-SA-4.0
+homepage: https://opencouncildata.co.uk/
+status: ready
+normalised: false
+fetch:
+  url: https://opencouncildata.co.uk/history2016-2026.csv
+  format: csv
+  release: "2016-2026"
+process:
+  - kind: csv-select
+    columns: ["council id", authority, year, total, con, lab, ld, green, ukip, ref, pc, snp, other, majority]
+  - kind: csv-rename
+    columns:
+      "council id": council_id
+      majority: control
+output:
+  processed: history2016-2026.csv
+notes: >-
+  Open Council Data UK seat-count history — one row per council per year.
+  `control` is the political-control summary (e.g. "Con", "NOC"). The
+  publisher's csv3.php endpoint maps each council to its ONS GSS code.

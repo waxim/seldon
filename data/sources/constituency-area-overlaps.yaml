@@ -1,0 +1,21 @@
+id: constituency-area-overlaps
+name: Constituency to Local Authority Area Overlaps
+group: geography
+description: >-
+  Area and population overlap between 2024 Westminster constituencies and 2023
+  local authority districts. Used to apportion LAD-level statistics down to
+  individual seats.
+publisher: mySociety
+licence: CC-BY-4.0
+homepage: https://pages.mysociety.org/2025-constituencies/
+status: ready
+normalised: false
+fetch:
+  url: https://pages.mysociety.org/2025-constituencies/data/geographic_overlaps/latest/PARL25_LAD23_combo_overlap.csv
+  format: csv
+  release: latest
+process:
+  - kind: csv-select
+    columns: [PARL25, LAD23, percentage_overlap_pop, overlap_pop]
+output:
+  processed: PARL25_LAD23_combo_overlap.csv

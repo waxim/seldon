@@ -1,0 +1,23 @@
+id: ni-deprivation-measure
+name: NI Multiple Deprivation Measure
+group: economic
+description: >-
+  Small-area deprivation ranks for Northern Ireland (NIMDM 2017) — the NI
+  equivalent of the English indices, an economic covariate for NI
+  constituencies.
+publisher: Northern Ireland Statistics and Research Agency
+licence: OGL-3.0
+homepage: https://www.nisra.gov.uk/publications/nimdm17-soa-level-results
+status: ready
+normalised: false
+fetch:
+  url: https://www.nisra.gov.uk/files/nisra/publications/NIMDM17_SOAresults.xls
+  format: xls
+  release: nimdm-2017
+process: []
+output:
+  processed: NIMDM17_SOAresults.xls
+notes: >-
+  Northern Ireland Multiple Deprivation Measure 2017 — ranks by Super Output
+  Area. Published as a legacy .xls workbook; converting it to CSV needs a
+  custom processor (xlsx-extract reads OOXML .xlsx only).

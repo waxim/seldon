@@ -1,0 +1,19 @@
+id: claimant-count
+name: Claimant Count
+group: economic
+description: >-
+  Claimant count (Universal Credit and Jobseeker's Allowance claimants) time
+  series from the ONS NOMIS API — a labour-market signal for the model.
+publisher: Office for National Statistics (NOMIS)
+licence: OGL-3.0
+homepage: https://www.nomisweb.co.uk/
+status: ready
+normalised: false
+fetch:
+  url: https://www.nomisweb.co.uk/api/v01/dataset/NM_162_1.data.csv?geography=2092957697&date=latest&gender=0&age=0&measure=1&measures=20100
+  format: csv
+  release: latest
+process: []
+notes: >-
+  The query returns the UK headline series; widen the `geography` parameter to
+  a constituency geography type for seat-level figures.

@@ -1,0 +1,28 @@
+id: census-economic-activity
+name: 2021 Census — Economic Activity
+group: demographic
+description: >-
+  Population by economic activity status (employed, unemployed, retired,
+  student, and so on) per Output Area from the 2021 Census of England and
+  Wales (table TS066).
+publisher: Office for National Statistics
+licence: OGL-3.0
+homepage: https://www.nomisweb.co.uk/sources/census_2021_bulk
+status: ready
+normalised: true
+ingest:
+  apiSource: census-2021
+fetch:
+  url: https://www.nomisweb.co.uk/output/census/2021/census2021-ts066.zip
+  format: zip
+  release: census-2021
+process:
+  - kind: unzip
+    member: census2021-ts066-oa.csv
+    to: census-economic-activity-oa.csv
+output:
+  processed: census-economic-activity-oa.csv
+notes: >-
+  ONS 2021 Census bulk table TS066. The widest of the census tables — a deep
+  employed/unemployed/inactive hierarchy. The Output Area CSV is extracted;
+  the zip also holds LSOA, MSOA, and local-authority grains.

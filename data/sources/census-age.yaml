@@ -1,0 +1,28 @@
+id: census-age
+name: 2021 Census — Age Structure
+group: demographic
+description: >-
+  Population by five-year age band per Output Area from the 2021 Census of
+  England and Wales (table TS007A). A core marginal the household synthesiser
+  fits to.
+publisher: Office for National Statistics
+licence: OGL-3.0
+homepage: https://www.nomisweb.co.uk/sources/census_2021_bulk
+status: ready
+normalised: true
+ingest:
+  apiSource: census-2021
+fetch:
+  url: https://www.nomisweb.co.uk/output/census/2021/census2021-ts007a.zip
+  format: zip
+  release: census-2021
+process:
+  - kind: unzip
+    member: census2021-ts007a-oa.csv
+    to: census-age-oa.csv
+output:
+  processed: census-age-oa.csv
+notes: >-
+  ONS 2021 Census bulk table TS007A. The zip carries one CSV per geography
+  (OA, LSOA, MSOA, LTLA, UTLA, region, country); the Output Area file is the
+  finest grain and is bridged onto wards via output-area-ward-lookup.

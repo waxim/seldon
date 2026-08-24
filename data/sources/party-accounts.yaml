@@ -1,0 +1,32 @@
+id: party-accounts
+name: Political Party Statements of Accounts
+group: financial
+description: >-
+  Annual statements of accounts filed by registered political parties with
+  the Electoral Commission — overall party financial health.
+publisher: Electoral Commission
+licence: OGL-3.0
+homepage: https://search.electoralcommission.org.uk/Search/Accounts
+status: ready
+normalised: false
+fetch:
+  url: https://search.electoralcommission.org.uk/api/csv/Accounts?start=0&rows=50000&query=&sort=PublishedDate&order=desc&et=pp&et=ppm&et=npc&et=rp&et=perpar&et=tp
+  format: csv
+  release: latest
+process:
+  - kind: csv-select
+    columns: [ECRef, RegulatedEntityName, RegisterName, ReportingPeriodDescription, TotalIncome, TotalExpenditure, NetAssets, NetLiabilities, FinancialYearEnd, PublishedDate]
+  - kind: csv-rename
+    columns:
+      ECRef: id
+      RegulatedEntityName: party
+      ReportingPeriodDescription: period
+      FinancialYearEnd: financial_year_end
+      PublishedDate: published_date
+output:
+  processed: party-accounts.csv
+notes: >-
+  Electoral Commission statements-of-accounts CSV export (~19,000 rows). The
+  EC search only sorts the Accounts dataset by PublishedDate or TotalIncome —
+  any other sort silently returns an empty file. Monetary columns are
+  "£"-formatted strings.

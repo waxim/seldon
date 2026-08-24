@@ -1,0 +1,24 @@
+id: uk-election-statistics-century
+name: UK Election Statistics 1918-2023
+group: results
+description: >-
+  House of Commons Library century-long summary of UK general elections —
+  turnout, seats, and vote share by party per election. National-level
+  reference data.
+publisher: House of Commons Library
+licence: OGL-3.0
+homepage: https://commonslibrary.parliament.uk/research-briefings/cbp-7529/
+status: ready
+normalised: false
+fetch:
+  url: https://researchbriefings.files.parliament.uk/documents/CBP-7529/general-elections-and-governments.xlsx
+  format: xlsx
+  release: cbp-7529
+process: []
+output:
+  processed: general-elections-and-governments.xlsx
+notes: >-
+  House of Commons Library briefing CBP-7529, "UK Election Statistics:
+  1918-2023". A national summary, not constituency-level. The host
+  researchbriefings.files.parliament.uk may block automated downloads; if the
+  fetch 403s, place the file manually in data/raw/.
