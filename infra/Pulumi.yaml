@@ -1,0 +1,14 @@
+name: seldon
+description: >-
+  Account-level Cloudflare resources for Seldon: anything that holds data
+  or grants access, and so outlives any single deploy
+  (docs/12-deployment.md). Worker-attached configuration belongs to each
+  app's wrangler.jsonc, not here.
+runtime:
+  name: nodejs
+  options:
+    packagemanager: bun
+    typescript: true
+config:
+  cloudflare:apiToken:
+    secret: true

@@ -1,0 +1,66 @@
+/*
+ * Foundation modern — the Seldon design language (docs/09-terminus.md).
+ *
+ * Dark by default: deep space, not grey, with one warm radiant accent.
+ * The token names are the contract; these values are the reference set.
+ */
+:root {
+  --void: #0a0e1a;
+  --surface: #111726;
+  --surface-raised: #18203a;
+  --ink: #e9ecf5;
+  --ink-muted: #9aa3b8;
+  --radiant: #e3b34c;
+  --hairline: #232c45;
+  --positive: #4cc38a;
+  --negative: #e5484d;
+
+  --font-ui: "Source Sans 3", system-ui, -apple-system, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", monospace;
+
+  --text-xs: 13px;
+  --text-sm: 14px;
+  --text-md: 16px;
+  --text-lg: 20px;
+  --text-xl: 28px;
+  --text-display: 40px;
+
+  --motion-fast: 120ms;
+  --motion-panel: 200ms;
+  --motion-camera: 320ms;
+  --easing: cubic-bezier(0.2, 0.6, 0.3, 1);
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+
+  --radius: 6px;
+}
+
+:root[data-theme="light"] {
+  --void: #f7f6f2;
+  --surface: #ffffff;
+  --surface-raised: #ffffff;
+  --ink: #171b26;
+  --ink-muted: #5a6172;
+  --radiant: #b78a2e;
+  --hairline: #e3e1da;
+  --positive: #2f8f63;
+  --negative: #c2373b;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --motion-fast: 1ms;
+    --motion-panel: 1ms;
+    --motion-camera: 1ms;
+  }
+}
+
+/* Numbers never shimmy: every numeric surface is tabular. */
+.seldon-numeric {
+  font-variant-numeric: tabular-nums;
+}

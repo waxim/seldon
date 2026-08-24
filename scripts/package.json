@@ -1,0 +1,15 @@
+{
+  "name": "@seldon/scripts",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --build",
+    "lint": "biome check .",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@seldon/foundation": "workspace:*",
+    "@seldon/client": "workspace:*"
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "dist/types",
+    "rootDir": ".",
+    "lib": ["ES2022"],
+    "types": ["@types/bun"]
+  },
+  "include": ["**/*.ts"],
+  "references": [
+    { "path": "../packages/foundation" },
+    { "path": "../packages/client" }
+  ]
+}

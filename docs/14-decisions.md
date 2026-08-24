@@ -3,7 +3,7 @@
 *An epoch records what the population was; a decision records what we were
 thinking.*
 
-Twelve architecture decision records, D1–D12, in the classic short form:
+Fourteen architecture decision records, D1–D14, in the classic short form:
 Context, Decision, Consequences, and — where sensible — the triggers that
 would reopen the question. These are the choices the rest of the design
 leans on; the documents linked from each ADR carry the detail. A decision
@@ -262,6 +262,61 @@ future ops CLI cheap without ever making it load-bearing. Detail:
 **Revisit if** operators need scripting or automation hooks; the answer is
 the ops CLI (or plain API tokens), never a return of the CLI as the
 product surface.
+
+## D13 — RPC contracts live in `@seldon/foundation`
+
+**Context.** [11-api](11-api.md) types a service binding by importing the
+callee's entrypoint class:
+`Service<import("../../radiant/src/entrypoint").RadiantEntrypoint>`. Built
+out, that pattern makes the type graph cyclic — Radiant reads a dossier's
+leanings from Vault, Vault records a run into Psychohistory, and
+Psychohistory reads cells back from Radiant — and TypeScript project
+references cannot express a cycle.
+
+**Decision.** The RPC surface of each internal service is declared as an
+interface in `@seldon/foundation` (`RadiantRpc`, `VaultRpc`,
+`EncyclopediaRpc`, `PsychohistoryRpc`, `SecondFoundationRpc`). Each
+entrypoint class declares `implements` against its contract, and every
+`Env` types its bindings with the interface. Callers depend on the
+contract, never on another app's source.
+
+**Consequences.** The apps form a dependency-free set that share one
+package, so a service can be typechecked, tested and deployed without its
+callees' source. Drift is still caught, because a service whose entrypoint
+stops satisfying its contract fails typecheck at `implements`. The cost is
+one more place to edit when a method is added: contract first, then the
+implementation.
+
+**Revisit if** the cycle disappears (it is domain-shaped, so it probably
+will not), or if a generated client for internal RPC makes hand-written
+contracts redundant.
+
+## D14 — Terminus serves the API same-origin at `/api`
+
+**Context.** Access fronts two hostnames, the console and the API
+([11-api](11-api.md)). A browser calling the API hostname from the console
+hostname is a cross-origin, credentialed request: it needs CORS on the
+Access application and a second Access session, and it fails in ways that
+look like application bugs.
+
+**Decision.** Terminus's Worker — already the console's thin edge layer —
+proxies `/api/*` to Demerzel over a service binding, forwarding the
+request unmodified so the Access assertion travels with it and Demerzel
+validates it exactly as it would on a direct call. `@seldon/client` is
+pointed at `/api` by default. The API hostname keeps its own route and
+Access application: automation, the smoke walk and any future consumer use
+it directly.
+
+**Consequences.** The console is one origin under one Access session, and
+`@seldon/client` remains the only way Terminus talks to the system — the
+rule in [09-terminus](09-terminus.md) is unchanged, only its base URL is.
+Terminus gains exactly one service binding (`DEMERZEL`) and no domain
+state. The gateway is still the one public API; the proxy adds no
+behaviour of its own, so a bug there is visible as a plain pass-through.
+
+**Revisit if** a second first-party consumer appears that cannot proxy, or
+if streaming (the run-progress WebSocket) behaves differently through the
+binding than direct — the direct hostname stays available either way.
 
 Related: [01-vision](01-vision.md) · [03-architecture](03-architecture.md) ·
 [04-population](04-population.md) · [08-engine](08-engine.md) ·

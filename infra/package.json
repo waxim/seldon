@@ -1,0 +1,16 @@
+{
+  "name": "@seldon/infra",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "index.ts",
+  "scripts": {
+    "typecheck": "tsc --build",
+    "lint": "biome check src index.ts"
+  },
+  "dependencies": {
+    "@pulumi/cloudflare": "^6.15.0",
+    "@pulumi/pulumi": "^3.204.0",
+    "@seldon/foundation": "workspace:*"
+  }
+}
