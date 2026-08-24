@@ -24,7 +24,7 @@ One sentence, applied everywhere:
 | Store | Holds | Because |
 | --- | --- | --- |
 | D1 (per service) | Worlds, epochs, forks, layers; catalogue + locks; scenarios, questions, runs, outcomes; audit log | Small, relational, queryable from any Worker; one database per owning service |
-| DO SQLite (per seat shard) | Households, persons, cells, fork deltas | Data locality: the compute that reads these rows runs in the same object ([08-engine](08-engine.md)) |
+| DO SQLite (per seat × epoch shard) | Households, persons, cells, fork deltas, standing-run leanings | Data locality: the compute that reads these rows runs in the same object ([08-engine](08-engine.md)) |
 | R2 | Raw fetches, staged Parquet, epoch snapshots, run artefacts, PMTiles, exports, lock history | Immutable, bulky, zero egress; the archival truth D1 and DOs can be rebuilt from |
 | KV | Poll-of-polls, compiled plans, hot aggregates, tile manifests, flags | Read-mostly, eventually consistent, cheap at the edge |
 
@@ -57,11 +57,13 @@ Four id families, chosen by what the id must do:
 | `slug@version` | Authored document | `general-election-today@4`, `income@2` | Questions, layers, caveats, resolvers |
 
 **Content-hash ids** are the first 12 hex chars (48 bits) of sha256 over
-the thing's defining inputs — `ep_` over `(worldId, dataVersion,
-synthConfig, seed)`, `sc_` over the scenario document minus cosmetic
-fields ([06-scenarios](06-scenarios.md)). Same inputs, same id: these ids
-*are* the reproducibility contract. 48 bits is comfortable at thousands
-of epochs, not billions; the full hash is kept in the owning row.
+the thing's defining inputs — `ep_` over `(worldId,
+populationDataVersion, synthConfig, seed)`
+([04-population](04-population.md)), `sc_` over the scenario document
+minus cosmetic fields ([06-scenarios](06-scenarios.md)). Same inputs,
+same id: these ids *are* the reproducibility contract. 48 bits is
+comfortable at thousands of epochs, not billions; the full hash is kept
+in the owning row.
 
 **Time-sortable ids** are ULIDs (lowercase Crockford base32) behind a
 type prefix. Creation order becomes lexicographic order — `ORDER BY
@@ -70,13 +72,14 @@ inserts stay append-mostly.
 
 **World-scoped composite ids** encode routing. `uk:E14001156:p:01a2f0`
 reads: world `uk`, seat `E14001156` (ONS GSS codes — `E14`/`W07`/`S14`/
-`N05` prefixes), kind, local hex id within the shard. The shard DO is
-addressed as `idFromName("uk:E14001156")` — **the id alone locates the
-row's Durable Object** — so no shard directory table exists anywhere.
-Nothing crosses worlds. Dense views may abbreviate `cell:042` to `c042`;
-the canonical form is the long one. **Authored ids** (`slug@version`)
-name human-versioned documents where identity is "which revision", not
-"which bytes".
+`N05` prefixes), kind, local hex id within the shard. Shard DOs are
+epoch-keyed: the object holding a row is addressed as
+`idFromName("uk:E14001156:ep_5f9c2a1d44e0")` — **the id plus the epoch
+in view locates the row's Durable Object** — so no shard directory
+table exists anywhere. Nothing crosses worlds. Dense views may
+abbreviate `cell:042` to `c042`; the canonical form is the long one.
+**Authored ids** (`slug@version`) name human-versioned documents where
+identity is "which revision", not "which bytes".
 
 ## D1 schemas (DDL sketches)
 
@@ -98,14 +101,16 @@ CREATE TABLE worlds (
 CREATE TABLE epochs (
   epoch_id TEXT PRIMARY KEY,       -- 'ep_…'; untruncated hash alongside
   world_id TEXT NOT NULL REFERENCES worlds, full_hash TEXT NOT NULL,
-  data_version TEXT NOT NULL,      -- 'dv_…' (Encyclopedia)
+  data_version TEXT NOT NULL,      -- 'dv_…' full lineage (Encyclopedia)
+  population_data_version TEXT NOT NULL,  -- 'dv_…' epoch-hash input (04)
   synth_config TEXT NOT NULL, seed INTEGER NOT NULL,
-  status TEXT NOT NULL,            -- synthesising|validating|live|
+  status TEXT NOT NULL,            -- synthesising|validating|published|
   snapshot_prefix TEXT,            --   superseded|failed (CHECKed)
   validation TEXT,                 -- JSON: per-seat fidelity summary
   published_at TEXT
 );
-CREATE INDEX epochs_live ON epochs (world_id, status, published_at DESC);
+CREATE INDEX epochs_published
+  ON epochs (world_id, status, published_at DESC);
 
 CREATE TABLE forks (
   fork_id TEXT PRIMARY KEY,        -- 'fk_' hash(epoch, skews, seed)
@@ -188,12 +193,18 @@ CREATE TABLE runs (                -- one row per tuple execution
   world_id TEXT NOT NULL, population_id TEXT NOT NULL,  -- 'ep_…'|'fk_…'
   scenario_hash TEXT NOT NULL, engine_version TEXT NOT NULL,
   question_slug TEXT NOT NULL, question_version INTEGER NOT NULL,
+  reference_date TEXT NOT NULL,    -- ISO date pinned at launch; Mule
+                                   --   decay + polling freshness (08)
   seed INTEGER NOT NULL, iterations INTEGER NOT NULL,
   status TEXT NOT NULL,            -- queued|compiling|running|
   coordinator_id TEXT,             --   aggregating|done|failed
   artefact_prefix TEXT,            -- R2: runs/uk/run_…/
   created_at TEXT NOT NULL, finished_at TEXT
 );
+CREATE UNIQUE INDEX runs_dedupe    -- dedupe key: tuple + iterations
+  ON runs (world_id, population_id, scenario_hash, question_slug,
+           question_version, engine_version, reference_date, seed,
+           iterations);
 CREATE INDEX runs_by_question
   ON runs (world_id, question_slug, question_version, run_id DESC);
 
@@ -219,30 +230,37 @@ CREATE TABLE audit_log (           -- append-only; never updated
   role TEXT NOT NULL,              -- owner|operator|viewer
   method TEXT NOT NULL, path TEXT NOT NULL,
   service TEXT NOT NULL,           -- routed target
+  action TEXT NOT NULL,            -- 'launch-run'|'pin-source'|…
+  resource_type TEXT, resource_id TEXT,  -- 'run', 'run_01j9dq3zx8k7'
+  origin TEXT NOT NULL,            -- console|api|cron
   status INTEGER NOT NULL, latency_ms INTEGER, request_id TEXT NOT NULL
 );
 ```
 
-A Second Foundation cron exports closed months to R2
-(`audit/uk/2026-08.parquet`) and prunes, keeping D1 small and the history
-permanent.
+Demerzel's own cron exports closed months to the dedicated audit bucket
+(`audit/uk/2026-08.parquet` in `seldon-audit`, bound to Demerzel alone)
+and prunes, keeping D1 small and the history permanent.
 
 ## The shard DO SQLite schema
 
-One Durable Object per `(world, seat)`, named `uk:E14001156`, holding that
-seat's slice (~43k households, ~75k persons, ~50–200 cells; tens of MB —
-far under the 10 GB object limit):
+One Durable Object per `(world, seat, epoch)`, named
+`uk:E14001156:ep_5f9c2a1d44e0`, holding that seat's slice of that epoch
+(~43k households, ~75k persons, ~50–200 cells; tens of MB — far under
+the 10 GB object limit). The published epoch's 650 objects stay hot;
+superseded epochs hydrate on demand (below):
 
 ```sql
 CREATE TABLE meta (                -- one row: what this shard holds
-  world_id TEXT, seat_id TEXT, epoch_id TEXT, published_at TEXT,
+  world_id TEXT, seat_id TEXT, epoch_id TEXT,  -- = the DO's naming key
+  published_at TEXT,
+  hydration TEXT,                  -- cold|hydrating|live|evicted
   layer_versions TEXT, row_counts TEXT  -- JSON {column → layer_id@ver}
 );
 
 CREATE TABLE households (
   hh_local INTEGER PRIMARY KEY,    -- global id: uk:E14001156:hh:<hex>
   size INTEGER NOT NULL, composition TEXT NOT NULL, -- census classes
-  tenure TEXT NOT NULL,            -- owned|mortgage|social|private
+  tenure TEXT NOT NULL,            -- owned|mortgage|social-rent|private-rent
   oa_code TEXT NOT NULL,           -- L4 small area (placement basis)
   lat REAL NOT NULL, lon REAL NOT NULL,  -- synthetic, density-weighted
   -- layer columns appended by layer application, e.g.:
@@ -254,7 +272,8 @@ CREATE TABLE persons (
   p_local INTEGER PRIMARY KEY,     -- uk:E14001156:p:<hex>
   hh_local INTEGER NOT NULL REFERENCES households,
   age INTEGER NOT NULL, sex TEXT NOT NULL,
-  qualification TEXT NOT NULL,     -- none|l1|l2|apprentice|l3|l4plus
+  qualification TEXT NOT NULL,     -- none|level1|level2|apprenticeship|
+                                   --   level3|level4plus (06's registry)
   activity TEXT NOT NULL,          -- employed|unemployed|retired|…
   registered INTEGER NOT NULL,     -- 0|1, from the registration layer
   income_band TEXT,                -- layer column
@@ -275,16 +294,26 @@ CREATE TABLE fork_cells (          -- lazily materialised fork deltas
   n_persons INTEGER NOT NULL, n_registered INTEGER NOT NULL,  -- post-skew
   PRIMARY KEY (fork_id, cell_local)
 );
+
+CREATE TABLE run_leanings (        -- hot copy of a standing run's
+  run_id TEXT NOT NULL,            --   per-cell artefact (see 04)
+  cell_local INTEGER NOT NULL REFERENCES cells,
+  distribution TEXT NOT NULL,      -- JSON {optionId → mean share}
+  turnout REAL NOT NULL,
+  touched_by TEXT NOT NULL,        -- JSON: matched rule/Mule ids
+  PRIMARY KEY (run_id, cell_local)
+);
 ```
 
 Design points, honestly traded:
 
 - **Layers are columns, not rows.** An entity–attribute–value table was
   rejected: it multiplies rows by attributes and kills typed predicates.
-  Wide columns mean the DSL compiles to plain SQL (`tenure = 'social'
-  AND age > 65`) and explore counts are index scans. The cost — `ALTER
-  TABLE ADD COLUMN` across 650 shards per layer — is fine: publication
-  is already a fan-out workflow and SQLite's `ADD COLUMN` is O(1).
+  Wide columns mean the DSL compiles to plain SQL (`tenure =
+  'social-rent' AND age > 65`) and explore counts are index scans. The
+  cost — `ALTER TABLE ADD COLUMN` across 650 shards per layer — is
+  fine: publication is already a fan-out workflow and SQLite's
+  `ADD COLUMN` is O(1).
   Per-row provenance is deliberately *not* stored: it is constant per
   column, lives in `meta.layer_versions`, and the dossier joins
   column → layer at read time.
@@ -294,15 +323,27 @@ Design points, honestly traded:
 - **Forks store deltas, not copies**: rewritten cell weights (plus
   appended synthetic persons for cohort-adding skews); browsing a fork
   is epoch households plus the overlay.
-- **Epochs replace shard contents wholesale.** A shard is a projection
-  of the epoch, rebuilt at publish; the R2 snapshot is the truth it can
-  always be rebuilt from.
+- **Shards are epoch-keyed, never rebuilt in place.** A publish creates
+  the new epoch's 650 objects and keeps them hot; a superseded epoch's
+  objects hydrate on demand from its R2 snapshot and are evicted when
+  idle — `cold → hydrating → live → evicted`, re-hydratable, with the
+  state machine driven by Radiant. Browsing a superseded epoch
+  therefore works; the first hit is slower, and the console discloses
+  it. R2 Parquet snapshots are retained for every epoch — the cheap
+  durable form — while shard-resident copies and tiles are disposable
+  and rebuildable ([04-population](04-population.md) states the
+  retention policy).
+- **Standing-run leanings are cached shard-side.** After a standing
+  run, the run's per-cell `cells` artefact is pushed to every shard as
+  one `run_leanings` row per cell, keyed by run id; dossiers join it
+  locally, and Radiant falls back to Vault RPC when the copy is absent
+  ([04-population](04-population.md)).
 
 ## R2 layout
 
-Four buckets, split by lifecycle and access pattern rather than by
-service. Physical names are env-suffixed (`seldon-epochs-production`);
-binding names are env-invariant (below). Keys put the world id first
+Five buckets, split by lifecycle and access pattern. Physical names are
+env-suffixed (`seldon-epochs-production`); binding names are
+env-invariant (below). Keys put the world id first
 after the family prefix; content-addressed segments are immutable —
 **nothing under a hash or ULID key is ever overwritten**.
 
@@ -319,21 +360,28 @@ seldon-epochs/              (Radiant; binding EPOCH_BUCKET)
 │   └── seat=E14001156/{households,persons,cells}.parquet
 └── forks/uk/fk_9a01bb37c2d4/seat=E14001156/…       # materialised on use
 
-seldon-tiles/               (Radiant tile builds; binding TILE_BUCKET)
+seldon-tiles/               (Radiant → Terminus; binding TILE_BUCKET)
 └── tiles/uk/ep_5f9c2a1d44e0/{households,boundaries}.pmtiles
 
 seldon-runs/                (Vault + Psychohistory; binding RUN_BUCKET)
 ├── runs/uk/run_01j9dq3zx8k7/
 │   ├── plan.json                           # compiled plan (audit copy)
 │   ├── seats/E14001156.parquet             # per-seat distributions
+│   ├── cells.parquet                       # per-cell mean distribution,
+│   │                                       #   turnout, matched rule ids
 │   └── outcome/{distributions,crosstabs}.parquet
-├── exports/uk/out_01j9dqm2w4p9/<format>…   # user-requested exports
-└── audit/uk/2026-08.parquet                # Demerzel monthly export
+└── exports/uk/out_01j9dqm2w4p9/<format>…   # user-requested exports
+
+seldon-audit/               (Demerzel only; binding AUDIT_BUCKET)
+└── audit/uk/2026-08.parquet                # closed-month audit export
 ```
 
 Tiles get their own bucket because their profile differs: range-request,
 high-volume reads through Terminus (R2's zero egress is the point), and
 rebuilt per epoch with old builds deletable — unlike archival snapshots.
+The audit bucket is separate for the opposite reason: it is bound to
+Demerzel alone, so the export path never crosses another service's
+bucket boundary.
 
 ## Iceberg and R2 SQL
 
@@ -341,16 +389,25 @@ Staged datasets and epoch snapshots are registered in the **R2 Data
 Catalog** as Apache Iceberg tables; heavy analytical queries run via
 **R2 SQL** instead of hauling Parquet through Workers. This is the v3
 home of the role DuckDB played in v2 ([14-decisions](14-decisions.md)
-D4). Registration convention: one catalog namespace per world and family
-— `uk_staged` (one table per staged source table, e.g.
+D4). Registration convention: one R2 Data Catalog namespace per world
+and family — `uk_staged` (one table per staged source table, e.g.
 `uk_staged.ge_results_2024`) and `uk_population` (`households`,
 `persons`, `cells`, partitioned by `epoch_id, seat_id`; each epoch
 publish appends its partitions). Keeping all epochs in one partitioned
 table, rather than a table per epoch, makes cross-epoch questions one
 query.
 
+There is no Workers-native way to write an Iceberg table: a commit is
+coordinated metadata and manifest writes that only a real Iceberg
+client performs. The ingestion and epoch-publish Workflows therefore
+invoke a small Container step — PyIceberg `add_files`/append — to
+commit staged and snapshot Parquet into the catalog
+([05-datasets](05-datasets.md)). Catalog operations and R2 SQL queries
+authenticate with a Cloudflare API token held as a Worker secret
+([12-deployment](12-deployment.md)), not a binding.
+
 ```sql
--- National tenure × qualification crosstab for the live epoch
+-- National tenure × qualification crosstab for the published epoch
 SELECT tenure, qualification, SUM(n_persons) AS persons
 FROM uk_population.cells
 WHERE epoch_id = 'ep_5f9c2a1d44e0'
@@ -368,13 +425,13 @@ GROUP BY p.seat_id, p.income_band;
 
 Epoch-over-epoch drift (registered adults per seat between two epoch
 ids) is the same pattern filtered to two partitions. Honest caveat:
-R2 SQL is a young product with a restricted SQL surface, and these
-queries may need reshaping — or pre-aggregation at staging time —
-against what it supports when built. The Parquet layout therefore stays
-engine-neutral (plain Hive-partitioned files under stable keys), so the
-fallback is mechanical: the same queries from DuckDB in a Container
-([03-architecture](03-architecture.md)) over the same objects. Analytics
-is a consumer of the layout, never its owner.
+R2 Data Catalog and R2 SQL are open-beta products. The SQL surface now
+covers these queries — GROUP BY, JOINs, CTEs and window functions are
+supported — but the grammar may still change. The Parquet layout
+therefore stays engine-neutral (plain Hive-partitioned files under
+stable keys), so the fallback is mechanical: the same queries from
+DuckDB in a Container ([03-architecture](03-architecture.md)) over the
+same objects. Analytics is a consumer of the layout, never its owner.
 
 ## KV namespaces
 
@@ -389,6 +446,7 @@ torn one.
 | `PLANS_KV` | Compiled scenario+question plans | `plan:<pl_hash>` | Immutable; TTL 30 d |
 | `AGG_KV` | Hot aggregates (standing headline, seat rollups) | `agg:uk:<epochId>:<key>` | Rewritten per standing run |
 | `TILES_KV` | Tile manifests (which PMTiles per epoch) | `tiles:uk:<epochId>` | Written at tile build |
+| `ACCESS_KEYS_KV` | Access public keys (Demerzel JWT verification) | `access:certs:<kid>` | Refreshed on rotation |
 | `FLAGS_KV` | Feature flags | `flag:<name>` | Operator-set |
 
 ## Binding naming conventions
@@ -405,12 +463,13 @@ by `infra/` ([12-deployment](12-deployment.md)). Rules:
 - Service-to-service bindings are the plain service name: `RADIANT`,
   `VAULT`, `ENCYCLOPEDIA`, `PSYCHOHISTORY`.
 - Canonical set (owner → binding): Radiant → `RADIANT_DB`,
-  `EPOCH_BUCKET`, `TILE_BUCKET`, `SHARD_DO`, `WORLD_REGISTRY_DO`,
-  `SYNTH_WF`, `SYNTH_TASKS_QUEUE`; Encyclopedia → `ENCYCLOPEDIA_DB`,
-  `DATASETS_BUCKET`, `INGEST_WF`; Psychohistory → `COORDINATOR_DO`,
-  `SIM_TASKS_QUEUE` (+ `SIM_TASKS_DLQ`), `PLANS_KV`; Vault → `VAULT_DB`,
-  `RUN_BUCKET`; Demerzel → `DEMERZEL_DB`; shared → `POLLS_KV`, `AGG_KV`,
-  `TILES_KV`, `FLAGS_KV`.
+  `EPOCH_BUCKET`, `TILE_BUCKET` (write: tile builds), `SHARD_DO`,
+  `WORLD_REGISTRY_DO`, `SYNTH_WF`, `SYNTH_TASKS_QUEUE`; Encyclopedia →
+  `ENCYCLOPEDIA_DB`, `DATASETS_BUCKET`, `INGEST_WF`; Psychohistory →
+  `COORDINATOR_DO`, `SIM_TASKS_QUEUE` (+ `SIM_TASKS_DLQ`), `PLANS_KV`;
+  Vault → `VAULT_DB`, `RUN_BUCKET`; Demerzel → `DEMERZEL_DB`,
+  `ACCESS_KEYS_KV`, `AUDIT_BUCKET`; Terminus → `TILE_BUCKET` (read:
+  tile serving); shared → `POLLS_KV`, `AGG_KV`, `TILES_KV`, `FLAGS_KV`.
 - The name→binding constant table lives in `@seldon/foundation`, so app
   code and Pulumi never drift.
 

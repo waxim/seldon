@@ -72,11 +72,15 @@ and are explicitly discarded, with reasoning recorded in
 ```
 
 Reading notes: arrows into Radiant's shards from Psychohistory represent
-per-seat simulation tasks delivered via Queues; Second Foundation drives the
-other services on cron (freshness checks, standing-question re-runs,
-calibration sweeps) through the same service bindings; Vault records every
-run and receives every outcome — nothing is predicted without being
-archived.
+per-seat simulation tasks — Queues can deliver only to consumer Workers,
+never to a Durable Object, so the sim-task consumer lives inside Radiant,
+consumes the queue, and invokes the local shard DOs over RPC; shards post
+partials back to Psychohistory's coordinator over service-binding RPC.
+That seam keeps Radiant's shards bound only inside Radiant (trust
+boundary 3 below). Second Foundation drives the other services on cron
+(freshness checks, standing-question re-runs, calibration sweeps) through
+the same service bindings; Vault records every run and receives every
+outcome — nothing is predicted without being archived.
 
 ## Services
 
@@ -121,8 +125,9 @@ design in [05-datasets](05-datasets.md).
 Pure compute; owns no long-lived domain state. One coordinator DO per run:
 it compiles scenario + question into a plan against the epoch's cells,
 precomputes seeded correlated shock vectors, fans per-seat tasks out over
-Queues to shard-local compute, aggregates partials, applies outcome
-functions and caveats, and streams progress to Terminus over WebSocket.
+Queues (Radiant's consumer Worker invokes the shard-local compute),
+aggregates partials, applies outcome functions and caveats, and streams
+progress to Terminus over WebSocket.
 Full engine design in [08-engine](08-engine.md).
 
 ### Vault — the asking domain
@@ -137,11 +142,54 @@ models in [06-scenarios](06-scenarios.md) and [07-questions](07-questions.md).
 
 Backtests, calibration (the shock magnitudes the engine consumes), drift
 monitoring, source-freshness watch, and scheduled work: polling refresh,
-standing-question re-runs, replica refreshes when population-relevant data
-changes. It quietly corrects the model and never adjusts silently — its
-outputs are versioned, provenance-stamped configuration. Execution
-mechanics of backtests live with the engine in [08-engine](08-engine.md);
-policy and cadence are Second Foundation's own.
+standing-question re-runs (daily 06:00 UTC plus on every polling refresh —
+the cadence is stated in [07-questions](07-questions.md)), and replica
+refreshes when population-relevant data changes. It quietly corrects the
+model and never adjusts silently — its outputs are versioned,
+provenance-stamped configuration.
+
+**Synthesis trigger policy.** Second Foundation owns the decision to mint
+an epoch. A new `populationDataVersion` — the hash over only the
+population-input sources enumerated in the world's synthesis config (see
+[05-datasets](05-datasets.md)) — proposes a synthesis run. Routine
+marginal refreshes auto-run; boundary, geography, or synthesis-config
+changes require owner approval in Terminus; and the minimum interval is
+one epoch per week unless an owner forces one manually.
+
+**Drift metrics.** Four watched quantities, each with a threshold and a
+route:
+
+1. **Standing headline vs `polling_now`** — any option's mean share
+   diverging from the poll-of-polls by more than 3 points across two
+   consecutive standing runs.
+2. **Epoch demographics vs the latest ONS mid-year estimates** — national
+   age×sex totals off by more than 1%, or any seat marginal beyond the
+   synthesis fidelity tolerance.
+3. **Backtest score regression** — Brier or log score worse than the
+   recorded baseline for the same backtest by more than 5%.
+4. **Source staleness** — any source overdue by more than one full period
+   of its declared cadence.
+
+A tripped threshold raises an alert on Terminus's drift watch, tagged
+with the metric and the offending artefact; (1) and (3) additionally
+badge affected standing outcomes with a drift caveat, and (2) proposes a
+synthesis run under the trigger policy above. Nothing auto-corrects:
+every alert demands a human, then a versioned configuration change.
+
+**Calibration cadence.** Shock magnitudes are re-fitted on every new
+election pair and on any boundary change. Honestly: exactly one pair
+exists today (2019 notional results → 2024 actuals, both on 2024
+boundaries), so fitted intervals are correspondingly humble and say so in
+their provenance.
+
+**Shy-response estimation.** Per-party shy factors are estimated from
+final-poll-vs-result deltas in the historical polling archive
+([05-datasets](05-datasets.md)), shrunk toward zero. The factors ship as
+committed, provenance-stamped configuration consumed by question caveats
+([07-questions](07-questions.md)) — never hand-set.
+
+Execution mechanics of backtests live with the engine in
+[08-engine](08-engine.md); policy and cadence are Second Foundation's own.
 
 ## Platform mapping
 
@@ -151,12 +199,12 @@ policy and cadence are Second Foundation's own.
 | **Durable Objects** (SQLite-backed) | The load-bearing choice. Per-seat **shards** in Radiant (one DO per constituency per world — ~650 for the UK — each holding its slice of households/persons/cells in DO SQLite, comfortably under the 10 GB/object limit at ~43k households/seat). Run **coordinators** in Psychohistory (one DO per run: compiles the plan, fans out, aggregates, streams progress over WebSocket). World registry DO in Radiant. Ingestion-state DOs in Encyclopedia if useful. |
 | **D1** | Per-service relational metadata: Encyclopedia's catalogue, Vault's scenarios/questions/runs/outcomes, Radiant's world/epoch/fork/layer registry, Demerzel's audit log. Not for population rows (that's DO SQLite + R2). |
 | **R2** | Bulk artefacts: raw fetched source files, staged Parquet, epoch snapshots (Parquet, partitioned by seat), run artefacts, map tiles (PMTiles), exports. Zero egress cost matters for tiles. |
-| **R2 Data Catalog + R2 SQL** | Epoch snapshots and staged datasets registered as Apache Iceberg tables; heavy analytical queries (national crosstabs, layer validation) run via R2 SQL instead of hauling Parquet through Workers. This replaces v2's DuckDB role. |
-| **Queues** | Fan-out/fan-in: synthesis tasks per seat, simulation shard tasks, ingestion events, tile-build jobs. DLQs everywhere. |
+| **R2 Data Catalog + R2 SQL** | Epoch snapshots and staged datasets registered as Apache Iceberg tables; heavy analytical queries (national crosstabs, layer validation) run via R2 SQL instead of hauling Parquet through Workers. There is no Workers-native Iceberg writer: the ingestion and epoch-publish Workflows invoke a small Container step (PyIceberg `add_files`/append) to commit staged and snapshot Parquet into the catalog. Both products are open beta, reached with a Cloudflare API token held as a Worker secret. This replaces v2's DuckDB role. |
+| **Queues** | Fan-out/fan-in: synthesis tasks per seat, simulation shard tasks, ingestion events, tile-build jobs. Consumers are always Workers — a queue cannot deliver to a DO — so the sim- and synthesis-task consumers live in Radiant and invoke its shard DOs over RPC. DLQs everywhere. |
 | **Workflows** | Durable multi-step orchestration: ingestion (fetch → verify → stage → load → derive), epoch synthesis (derive marginals → per-seat IPF → validate → publish), run execution envelope, calibration sweeps. Retries + resumability for free. |
 | **KV** | Read-mostly caches: poll-of-polls, compiled scenario plans, hot aggregates, tile manifests, feature flags. |
 | **Cron Triggers** | Second Foundation's watch: polling refresh cadence, source-freshness checks, drift checks, standing-question re-runs. |
-| **Containers** | Escape hatch for compute that outgrows Workers CPU limits: full-UK tile builds, very large calibration sweeps. Attached via DOs, still deployed from the monorepo. Default is *not* to need them. |
+| **Containers** | Escape hatch for compute that outgrows Workers CPU limits: full-UK tile builds, very large calibration sweeps, the Iceberg catalog commit step. Attached via DOs, still deployed from the monorepo. The largest instance is 4 vCPU / 12 GiB memory / 20 GB disk, so the full-UK tile build is a chunked pipeline — per-region tile builds merged into one PMTiles archive, never a single in-memory pass. Default is *not* to need them. |
 | **Workers AI / AI Gateway** | Roadmap-tier: natural-language → DSL question drafting; persona interviews grounded in a dossier ("ask this household why"). Always labelled as generative, never part of the statistical path. |
 | **Vectorize** | Roadmap-tier: semantic search over the catalogue and question archive. |
 | **Analytics Engine** | Operational telemetry: run timings, shard health, ingestion stats. |
@@ -175,16 +223,19 @@ The canon advances only through this flow; nothing edits it in place.
 2. The source is staged to typed Parquet in R2, loaded and validated
    (row counts, key uniqueness, referential joins), and the catalogue and
    data version advance in D1.
-3. Second Foundation notices a population-relevant change (cron-driven
-   freshness watch) and triggers Radiant's synthesis Workflow.
+3. Second Foundation notices a new `populationDataVersion` (cron-driven
+   freshness watch) and, under its synthesis trigger policy above,
+   triggers Radiant's synthesis Workflow.
 4. Synthesis: derive constituency marginals → per-seat IPF fan-out (Queues
-   deliver one task per seat to its shard DO) → per-seat fidelity
-   validation against published marginals, within tolerance or loud
-   failure → publish. Detail in [04-population](04-population.md).
+   deliver one task per seat to a consumer Worker in Radiant, which
+   invokes the seat's shard DO over RPC) → per-seat fidelity validation
+   against published marginals, within tolerance or loud failure →
+   publish. Detail in [04-population](04-population.md).
 5. Publishing an epoch means: shard DO SQLite becomes live for the new
-   epoch; a Parquet snapshot partitioned by seat lands in R2; the snapshot
-   is registered as an Iceberg table; a tile build renders new PMTiles.
-   The canon has advanced; the previous epoch remains addressable.
+   epoch; a Parquet snapshot partitioned by seat lands in R2; the
+   Workflow's Container step commits the snapshot to the Iceberg catalog;
+   a tile build renders new PMTiles. The canon has advanced; the previous
+   epoch remains addressable.
 
 ### 2. Ask → run → outcome
 
@@ -195,6 +246,7 @@ sequenceDiagram
     participant V as Vault
     participant P as Psychohistory (coordinator DO)
     participant Q as Queues
+    participant C as Radiant consumer Worker
     participant R as Radiant shard DOs (×650)
 
     T->>D: POST /questions/{id}/runs (scenario, population)
@@ -203,8 +255,9 @@ sequenceDiagram
     P->>P: compile scenario + question against epoch cells
     P->>P: precompute seeded correlated shock vectors
     P->>Q: enqueue per-seat tasks (×650)
-    Q->>R: task: plan slice + seeds for one seat
-    R-->>P: per-seat, per-iteration distributions
+    Q->>C: deliver tasks to Radiant's consumer
+    C->>R: RPC: plan slice + seeds for one seat
+    R-->>P: per-seat partials (service-binding RPC)
     P->>P: aggregate → outcome functions → caveats
     P->>V: store outcome (D1 headline + R2 artefacts)
     T-->>P: WebSocket — live progress throughout
@@ -213,9 +266,13 @@ sequenceDiagram
 A question, a scenario, and a population choice (epoch or fork) are
 submitted in Terminus. Vault records the run — the reproducibility tuple
 `(worldId, epochOrForkId, scenarioHash, questionVersion, engineVersion,
-seed)` — before any compute starts. The coordinator DO compiles, fans out,
-and aggregates; shard-local compute means cells never leave the DO that
-holds them. Terminus streams live progress (iterations done, seats
+referenceDate, seed)` — before any compute starts. `referenceDate` is
+pinned at launch (defaulting to the launch day) and is the date
+Mule-event decay and polling freshness are evaluated against, so the same
+tuple gives the same bytes on any later day. The coordinator DO compiles,
+fans out, and aggregates; tasks reach each seat through Radiant's
+queue-consumer Worker, and shard-local compute means cells never leave
+the DO that holds them. Terminus streams live progress (iterations done, seats
 resolved, headline convergence) over the coordinator's WebSocket, routed
 via Demerzel. Compilation, shock structure, and determinism guarantees are
 the engine's: [08-engine](08-engine.md). Outcome functions and caveats:

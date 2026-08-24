@@ -89,9 +89,10 @@ The most important lesson from v1 (below). Concretely:
 
 Every run is fully addressed by the tuple
 `(worldId, epochOrForkId, scenarioHash, questionVersion, engineVersion,
-seed)`. The same tuple always reproduces the same result, regardless of
-parallelism or scheduling. Determinism is a CI-grade contract, not an
-aspiration — see [the engine](08-engine.md).
+referenceDate, seed)`. The same tuple always reproduces the same result,
+regardless of parallelism, scheduling, or the day it is re-run — anything
+time-dependent is pinned to the tuple's reference date. Determinism is a
+CI-grade contract, not an aspiration — see [the engine](08-engine.md).
 
 ### 5. Synthetic-only, and proudly so
 

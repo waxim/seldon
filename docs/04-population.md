@@ -54,32 +54,51 @@ coarse in v1) — placement degrades gracefully to the finest mapped level.
 
 The **canon** is the one living replica of a world, never edited in
 place: it advances by **epoch**, each an immutable, addressable version
-of the population produced by a synthesis run over a specific data
-version. New census table, fresh boundaries, improved layer — each lands
-as a new epoch; the canon is simply the latest published one
+of the population produced by a synthesis run over a specific population
+data version. New census table, fresh boundaries, improved layer — each
+lands as a new epoch; the canon is simply the latest published one
 (`GET /worlds/uk/epochs/latest` via [Demerzel](11-api.md)).
 
 An epoch is deterministic and content-addressed —
-`epochId = hash(worldId, dataVersion, synthConfig, seed)` — same inputs,
-same epoch, bit for bit: the population leg of the
-[reproducibility tuple](01-vision.md). Lifecycle:
+`epochId = hash(worldId, populationDataVersion, synthConfig, seed)` —
+same inputs, same epoch, bit for bit: the population leg of the
+[reproducibility tuple](01-vision.md). `populationDataVersion` is hashed
+over only the population-input sources enumerated in the world's
+synthesis config — census marginals, boundaries, population estimates,
+address density. Encyclopedia's all-sources `dataVersion` still tracks
+lineage, but a polling refresh mints no population data version, so a
+poll scrape can never mint an epoch. Lifecycle:
 `synthesising → validating → published` (or `failed`, loudly), then
 `superseded` when a newer epoch publishes.
 
 A published epoch exists in three forms (storage detail in
 [10-data-model.md](10-data-model.md)): live rows in the per-seat shard
-DOs (what simulation and dossiers read), a Parquet snapshot in R2
-partitioned by seat (the archival truth), and an Iceberg table via R2
-Data Catalogue (what heavy analytics query through R2 SQL). Superseded
-epochs stay addressable forever — snapshot and registration remain — but
-their shard-resident copies may be evicted and re-hydrated on demand, so
-old runs stay reproducible without keeping 650 hot shards per epoch.
+DOs, keyed per epoch (`uk:E14001156:ep_5f9c2a1d44e0`) so epochs never
+overwrite each other (what simulation and dossiers read); a Parquet
+snapshot in R2 partitioned by seat (the archival truth); and an Iceberg
+table via R2 Data Catalog (what heavy analytics query through R2 SQL).
+
+Retention is asymmetric on purpose. The R2 Parquet snapshot of **every**
+epoch is kept indefinitely — it is the cheap, durable form — while
+shard-resident copies and tile builds are disposable and rebuildable
+from it. The published epoch's 650 shard objects stay hot; a superseded
+epoch's shards hydrate on demand from its snapshot and are evicted when
+idle (`cold → hydrating → live → evicted`, re-hydratable — the state
+machine lives in Radiant). Superseded epochs therefore stay addressable
+forever: old runs stay reproducible, and browsing a superseded epoch's
+map works — with a slower first hit while its shards re-hydrate,
+disclosed in the UI — without keeping 650 hot shards per epoch.
 
 ## The synthesis pipeline
 
 Synthesis is a Radiant-owned [Workflow](03-architecture.md) that turns a
-data version into an epoch. It runs per seat, fanned out over Queues to
-the 650 shard DOs — embarrassingly parallel, deterministic per seat.
+population data version into an epoch. It runs per seat, fanned out over
+Queues to a Radiant consumer Worker that invokes each of the 650 shard
+DOs over RPC — embarrassingly parallel, deterministic per seat. Fan-in
+is explicit: the world-registry DO tracks per-seat completions and
+failures, and the Workflow polls it in a step with a timeout, failing
+the epoch loudly — unfinished seats listed — if the count never closes
+(mirroring the run choreography in [08-engine.md](08-engine.md)).
 
 ```mermaid
 flowchart TD
@@ -96,8 +115,8 @@ flowchart TD
 
 Stage by stage:
 
-1. **Marginals.** Encyclopedia's derived `marginals` tables give, per
-   seat, the published census distributions: Census 2021 tables
+1. **Marginals.** Encyclopedia's derived `constituency_marginals` table
+   gives, per seat, the published census distributions: Census 2021 tables
    re-aggregated to 2024 Westminster boundaries for England & Wales;
    Scotland's Census 2022 aggregated up via the published Data Zone →
    constituency lookup; NI at coarser NISRA headline tables. Category
@@ -128,6 +147,15 @@ Stage by stage:
    stated band of the electorate source. Any failing seat blocks the
    epoch — no partially-good canon, no silent publish — and the per-seat
    fidelity report is stored with the epoch, surfaced in Terminus.
+
+### Ageing between censuses
+
+Census marginals go stale between census nights, so stage 1 does not
+use them raw: ONS mid-year population estimates re-scale the age×sex
+marginals per seat before IPF, keeping the replica's totals and age
+shape current between censuses. The re-scaling is a modelled adjustment
+and is disclosed as one — provenance on the affected marginals names
+the mid-year estimate vintage alongside the census table.
 
 At UK scale: ~28M households / ~50M adults — ~43k households and ~75k
 persons per shard — plus the ~50–200 cells per seat the engine computes
@@ -207,10 +235,10 @@ Skew operations, carried from legacy:
 | Op | Effect | Example |
 | --- | --- | --- |
 | `add-cohort` | Inject synthetic persons matching a template | add 120k newly-18 voters, nationally |
-| `remove-cohort` | Remove a fraction of a predicate-matched cohort | remove 10% of `tenure == private-rented && age < 35` in London seats |
+| `remove-cohort` | Remove a fraction of a predicate-matched cohort | remove 10% of `tenure == private-rent && age < 35` in London seats |
 | `age-shift` | Advance ages by N years (band membership moves; mortality is *not* modelled, and the fork's lineage says so) | age-shift 5 |
 | `scale-band` | Scale an age band's population | scale 18–24 × 1.15 |
-| `tenure-shift` | Move a fraction between tenures | 5% private-rented → owned |
+| `tenure-shift` | Move a fraction between tenures | 5% private-rent → owned |
 | `registration-rate` | Set/scale registration probability for a cohort | `age >= 18 && age <= 24` → 0.90 |
 
 Every op may be scoped by geography (world, region, named seats) and by
@@ -223,6 +251,15 @@ targets an epoch *or* a fork, and the fork's full lineage (parent epoch,
 ordered ops, seed) prints in the outcome's provenance footer. Forks
 answer "what if 18–24 registration hit 90%?"; scenarios answer "what if
 they all swung Green?" — and the two compose in one run.
+
+Fork browsing is honest about its granularity. Fork arithmetic is exact
+at cell and aggregate level — the counts, breakdowns and leanings a fork
+shows are true of the forked cells. At household level the map and
+dossiers render the *parent epoch's* households under a fork banner,
+with fork-adjusted cell leanings joined on top: household attributes
+remain the epoch's, except for the rows an `add-cohort` op materialises.
+A removed cohort still dots the street; its weight is gone from the
+cells — and the banner says so.
 
 ## The dossier
 
@@ -246,9 +283,9 @@ Its full shape (JSON, abridged values, real structure):
   "household": {
     "size": 2, "composition": "couple-no-children",
     "attributes": [
-      { "key": "tenure", "value": "owned-outright", "layer": "base",
+      { "key": "tenure", "value": "owned", "layer": "base",
         "provenance": { "source": "census2021-tenure",
-                        "dataVersion": "dv-2025-11", "method": "ipf+packing" } },
+                        "dataVersion": "dv_3e8b09c47f21", "method": "ipf+packing" } },
       { "key": "energyRating", "value": "D", "layer": "modelled",
         "provenance": { "layerId": "energy-rating@1", "holdout": "passed" } },
       { "key": "imdQuintile", "value": 4, "layer": "contextual",
@@ -270,8 +307,8 @@ Its full shape (JSON, abridged values, real structure):
       "leanings": {                       // joined from the standing run (Vault)
         "runId": "run_01j9…", "questionId": "general-election-today@4",
         "asOf": "2026-08-24T06:00:00Z",
-        "distribution": { "lab": 0.31, "con": 0.22, "ref": 0.24,
-                          "ld": 0.11, "grn": 0.07, "dk": 0.05 },
+        "distribution": { "lab": 0.31, "con": 0.22, "reform": 0.24,
+                          "ld": 0.11, "green": 0.07, "dont-know": 0.05 },
         "turnout": 0.74,
         "caveats": ["turnout-weighting@2", "dk-reallocation@1"]
       }
@@ -279,12 +316,13 @@ Its full shape (JSON, abridged values, real structure):
   ],
   "touchedBy": [                          // what reached this household, and why
     { "kind": "scenario-rule", "scenario": "current-polling@2026-08-24",
-      "rule": "pensioner-squeeze", "when": "age > 65 && tenure == owned-outright",
+      "rule": "pensioner-squeeze", "when": "age > 65 && tenure == owned",
+      "match": "partial",                 // rule cuts inside the cell — see below
       "matched": ["uk:E14001234:p:01a2f0"] },
     { "kind": "mule-event", "scenario": "current-polling@2026-08-24",
       "event": "leadership-contest", "phase": "decaying" }
   ],
-  "questionHistory": [                    // every ask this household was in
+  "questionHistory": [                    // runs whose frame matched this cell
     { "questionId": "general-election-today@4", "runId": "run_01j9…",
       "outcomeId": "out_01j9…", "askedAt": "2026-08-24T06:00:00Z" }
   ]
@@ -292,11 +330,23 @@ Its full shape (JSON, abridged values, real structure):
 ```
 
 Reading it: `leanings` are the person's cell probabilities from the
-latest standing run (joined from [Vault](07-questions.md) — the dossier
-never invents a leaning); `touchedBy` explains *why* — which scenario
-rules and Mule events matched this household in that run. Persons in the
-same cell share leanings by construction — the dossier shows the cell id
-rather than pretending person-level variation the model does not have.
+latest standing run — the dossier never invents a leaning. A standing
+run persists a per-cell artefact for exactly this join: mean option
+distribution, mean turnout, and the matched rule and Mule-event ids per
+cell, written as a `cells` table in the run's R2 artefacts and pushed as
+a hot copy — one row per cell, keyed by runId — into each shard's SQLite
+([08-engine.md](08-engine.md), [10-data-model.md](10-data-model.md)). At
+read time the shard joins its local copy; if it is absent — a cold
+shard, an evicted epoch — Radiant falls back to a
+[Vault](07-questions.md) RPC for the artefact. `touchedBy` is the same
+artefact read the other way: a household's entries are the matched rule
+and Mule ids of its cell, and a rule that catches only part of the cell
+is badged `partial`. `questionHistory` is not stored per household at
+all: Vault computes it at read time — the runs, across the world and the
+epoch's lineage, whose compiled frame gave this household's cell a
+non-zero match fraction. Persons in the same cell share leanings by
+construction — the dossier shows the cell id rather than pretending
+person-level variation the model does not have.
 
 ## Aggregate browsing
 
@@ -304,7 +354,7 @@ Every view above the household — street, ward, seat, region, nation — is
 the same operation: an aggregation over the population with the same
 typed-DSL filters used everywhere else. One verb, three shapes:
 
-- **count** — `tenure == social && age > 65`, at any level;
+- **count** — `tenure == social-rent && age > 65`, at any level;
 - **breakdown** — the same filter split by a field
   (`breakdown by=tenure` over a ward);
 - **compare** — two filters or two geographies side by side, and after a
@@ -315,12 +365,25 @@ typed-DSL filters used everywhere else. One verb, three shapes:
 Mechanically: seat-and-below aggregates are answered by the seat's shard
 DO (the rows live there); region and national views roll up cached
 per-seat partials; heavy national crosstabs run as R2 SQL over the
-epoch's Iceberg tables ([10-data-model.md](10-data-model.md)). Because
-the population is synthetic there is **no disclosure risk in small
-counts** — but there is a fidelity limit, so aggregates beneath the
-resolution of the source marginals render a "below source resolution"
-warning rather than false precision. The explore UI itself is
-[Terminus's](09-terminus.md).
+epoch's Iceberg tables ([10-data-model.md](10-data-model.md)).
+
+Live counts — the as-you-type national count in explore, rule cards and
+the frame builder — come in two classes with stated budgets, evaluated
+on a debounced typing pause. A **signature-aligned** predicate (banded
+and enum fields only) is answered from a national cell-aggregate table —
+~40–80k rows per epoch, held in D1/KV — exact, target under 300 ms. A
+**person-level** predicate (any continuous field: `age > 50`,
+`income < 30k`) cannot be pre-aggregated: it runs as a bounded shard
+fan-out with progressive partial counts behind a progress affordance, or
+as an async R2 SQL count — seconds, and shown as seconds, never dressed
+up as instant. Which class each surface uses, and its UX budget, is
+stated in [09-terminus.md](09-terminus.md).
+
+Because the population is synthetic there is **no disclosure risk in
+small counts** — but there is a fidelity limit, so aggregates beneath
+the resolution of the source marginals render a "below source
+resolution" warning rather than false precision. The explore UI itself
+is [Terminus's](09-terminus.md).
 
 ## The privacy stance
 

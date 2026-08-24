@@ -18,9 +18,14 @@ progress, auth, and the versioning policy. Storage schemas live in
 ## Conventions
 
 - **JSON only**, UTF-8, timestamps ISO-8601 UTC, camelCase wire fields.
-- **Ids are branded and world-scoped** (`hh_uk_01J8…`, `run_uk_01J9…` —
-  formats in [10-data-model](10-data-model.md)), so a single resource is
-  addressable without a world prefix. Convention: *collections* live under
+- **Ids are branded and follow the four families in
+  [10-data-model](10-data-model.md)**: content hashes
+  (`ep_5f9c2a1d44e0`, `sc_9f2c8b1e07aa`), lowercase ULIDs
+  (`run_01j9dq3zx8k7`, `out_01j9dq4vw8n2`), world-scoped composites
+  (`uk:E14001156:hh:00b3c1`), and authored `slug@version` documents
+  (`general-election-today@4`). Composites carry their world and ULIDs
+  are globally unique, so a single resource is addressable without a
+  world prefix. Convention: *collections* live under
   `/worlds/{worldId}/…`; *single resources* are fetched top-level by their
   fully qualified id (`/households/{householdId}/dossier`). Vault documents
   (scenarios, questions, runs, outcomes) are top-level collections whose
@@ -46,7 +51,6 @@ progress, auth, and the versioning policy. Storage schemas live in
 | Layers | Radiant | `GET /worlds/{worldId}/layers` |
 | Dossiers | Radiant | `GET /households/{householdId}/dossier` |
 | Explore | Radiant | `POST /worlds/{worldId}/explore` (DSL count/breakdown/sample) |
-| Map tiles | R2 via gateway | `GET /worlds/{worldId}/tiles/{epochId}.pmtiles` (Range pass-through) |
 | Sources | Encyclopedia | `GET /sources` · `GET /sources/{sourceId}` · `POST /sources/{sourceId}/ingest` · `POST /sources/{sourceId}/repin` · `POST /sources/{sourceId}/upload` |
 | Data versions | Encyclopedia | `GET /data-versions` · `GET /data-versions/{id}/lineage` |
 | Scenarios | Vault | `GET/POST /scenarios` · `GET /scenarios/{id}/versions/{v}` · `POST /scenarios/{id}/lint` |
@@ -55,74 +59,103 @@ progress, auth, and the versioning policy. Storage schemas live in
 | Outcomes | Vault | `GET /runs/{runId}/outcome` · `GET /outcomes/{outcomeId}` · `GET /outcomes/{outcomeId}/export` |
 | Calibration | Second Foundation | `GET /calibration` · `GET /backtests` · `GET /drift` |
 | Audit | Demerzel | `GET /audit` (owner only) |
-| Meta | Demerzel | `GET /openapi.json` · `GET /healthz` |
+| Meta | Demerzel | `GET /openapi.json` · `GET /healthz` · `GET /healthz/deep` |
 
-Tiles are bulk bytes, not JSON: Demerzel authenticates the request, then
-streams the PMTiles archive from R2 honouring `Range`, so MapLibre's range
-requests work unmodified ([09-terminus](09-terminus.md)).
+Map tiles are deliberately absent: bulk PMTiles assets are served by
+Terminus's thin edge Worker inside the same Access session, outside the
+JSON API ([03-architecture](03-architecture.md)). `/healthz` answers from
+the gateway alone; `/healthz/deep` exercises each service binding — the
+probe [12-deployment](12-deployment.md)'s smoke test walks.
 
 ### Representative route: launch a run
 
 ```jsonc
-POST /questions/q_uk_ge-standing/runs
+POST /questions/general-election-today/runs
 {
   "questionVersion": 4,
-  "scenario": { "id": "scn_uk_current-polling", "version": 12 },
-  "population": { "epochId": "ep_uk_01J8QZK3" },   // or { "forkId": … }
+  "scenarioHash": "sc_9f2c8b1e07aa",
+  "population": { "epochId": "ep_5f9c2a1d44e0" },  // or { "forkId": … }
+  "referenceDate": "2026-08-24",   // optional; defaults to the launch day
   "iterations": 1000,
   "seed": 20260824
 }
 ```
 
+The body may reference the scenario as `{ "scenario": { "slug":
+"current-polling", "version": 12 } }` instead; Demerzel resolves it and
+the response shows the pinned hash — a run pins `scenarioHash`, never a
+name ([06-scenarios](06-scenarios.md)).
+
 ```jsonc
 202 Accepted
 {
-  "runId": "run_uk_01J9AB2C",
+  "runId": "run_01j9dq3zx8k7",
   "status": "queued",
   "tuple": {                       // the reproducibility tuple, resolved
-    "worldId": "uk", "epochOrForkId": "ep_uk_01J8QZK3",
-    "scenarioHash": "sha256:9f2c…", "questionVersion": 4,
-    "engineVersion": "1.3.0",      // pinned server-side, never client-set
+    "worldId": "uk", "epochOrForkId": "ep_5f9c2a1d44e0",
+    "scenarioHash": "sc_9f2c8b1e07aa", "questionVersion": 4,
+    "engineVersion": "1.4.0",      // pinned server-side, never client-set
+    "referenceDate": "2026-08-24", // Mule decay + polling freshness pin
     "seed": 20260824
   },
-  "links": { "self": "/runs/run_uk_01J9AB2C",
-             "progress": "/runs/run_uk_01J9AB2C/progress" }
+  "links": { "self": "/runs/run_01j9dq3zx8k7",
+             "progress": "/runs/run_01j9dq3zx8k7/progress" }
 }
 ```
 
 Run creation is naturally idempotent: a request resolving to an existing
-run's tuple returns `200` with that run rather than creating a duplicate —
-reproducibility doubles as dedupe ([08-engine](08-engine.md)).
+run's tuple *and iteration count* returns `200` with that run rather
+than creating a duplicate — reproducibility doubles as dedupe.
+Iterations sit outside the tuple because counter-based RNG makes
+iteration *i* identical regardless of the total: the tuple determines
+every per-iteration draw, and (tuple, iterations) determines the
+aggregates ([08-engine](08-engine.md)).
 
 ### Representative route: the dossier
 
+The dossier's content model is owned by
+[04-population](04-population.md); this route returns exactly that
+shape. Abridged:
+
 ```jsonc
-GET /households/hh_uk_01J8ZKQ4/dossier
+GET /households/uk:E14001156:hh:00b3c1/dossier
 200 OK
 {
-  "householdId": "hh_uk_01J8ZKQ4",
+  "householdId": "uk:E14001156:hh:00b3c1",
   "worldId": "uk",
-  "epochId": "ep_uk_01J8QZK3",
-  "seat": { "id": "E14001279", "name": "Wakefield and Rothwell" },
-  "location": { "lat": 53.68, "lng": -1.50,
-                "placement": "synthetic-density-weighted" },
-  "attributes": [
-    { "key": "tenure", "value": "social-rent", "layer": "census-base",
-      "provenance": "ons-census-2021/TS054@v3" },
-    { "key": "incomeBand", "value": "20-30k", "layer": "modelled:income@2",
-      "provenance": "modelled: tenure + qualification + region" }
-  ],
-  "persons": [ { "personId": "pn_uk_01J8ZKR7", "age": 54, "sex": "female",
-                 "qualification": "level-2", "registered": true } ],
-  "leanings": { "runId": "run_uk_01J97XN0", "asOf": "2026-08-23T06:00:00Z",
-                "shares": { "lab": 0.41, "con": 0.18, "ref": 0.24 } },
-  "questionHistory": [ /* question id + version + distribution */ ],
-  "touchedBy": [ /* scenario rules / Mule events that matched */ ]
+  "population": { "epochId": "ep_5f9c2a1d44e0", "forkId": null },
+  "geography": { "L1": { "code": "E14001156", "name": "…" }, "…": "…" },
+  "placement": { "lon": -2.30, "lat": 53.59,
+                 "method": "density-weighted", "synthetic": true },
+  "household": {
+    "attributes": [
+      { "key": "tenure", "value": "social-rent", "layer": "base",
+        "provenance": { "source": "census2021-tenure",
+                        "dataVersion": "dv_3e8a91c47f02" } }
+    ]
+  },
+  "persons": [ {
+    "personId": "uk:E14001156:p:01a2f0",
+    "cellId": "uk:E14001156:cell:042",
+    "attributes": [
+      { "key": "qualification", "value": "level2", "layer": "base",
+        "provenance": { "…": "…" } },
+      { "key": "income", "value": 24800, "layer": "modelled",
+        "provenance": { "layerId": "income@2", "holdout": "passed" } }
+    ],
+    "leanings": { "runId": "run_01j97xn0v2qd",
+                  "questionId": "general-election-today@4",
+                  "asOf": "2026-08-24T06:00:00Z",
+                  "distribution": { "lab": 0.41, "con": 0.18,
+                                    "reform": 0.24, "…": "…" } }
+  } ]
 }
 ```
 
-Every attribute carries its layer badge and provenance — the API shape of
-the honesty rule in [04-population](04-population.md).
+Every attribute carries its layer badge (`base` | `modelled` |
+`contextual`) and a structured provenance object — the API shape of the
+honesty rule in [04-population](04-population.md), which also defines
+the `touchedBy` and `questionHistory` blocks elided here.
 
 ### Representative route: explore
 
@@ -153,7 +186,7 @@ stripped — stack traces never leave the boundary.
     "message": "unknown field 'incom' in predicate",
     "details": { "position": { "line": 1, "column": 27 },
                  "suggestion": "income" },
-    "requestId": "req_01J9AB7F"
+    "requestId": "req_01j9ab7f2kdq"
   }
 }
 ```
@@ -227,12 +260,12 @@ server messages are a discriminated union on `type`, each with a
 monotonic `seq`:
 
 ```jsonc
-{ "type": "hello", "runId": "run_uk_01J9AB2C", "seq": 0,
+{ "type": "hello", "runId": "run_01j9dq3zx8k7", "seq": 0,
   "status": "running", "iterations": 1000, "seatsTotal": 650 }
 { "type": "progress", "seq": 41, "seatsDone": 312,
-  "headline": { "shares": { "lab": 0.34, "ref": 0.27 },
+  "headline": { "shares": { "lab": 0.34, "reform": 0.27 },
                 "band": 0.012 } }        // convergence half-width
-{ "type": "complete", "seq": 97, "outcomeId": "out_uk_01J9AC5D" }
+{ "type": "complete", "seq": 97, "outcomeId": "out_01j9dq4vw8n2" }
 { "type": "failed", "seq": 55,
   "error": { "code": "unprocessable", "message": "…" } }
 ```

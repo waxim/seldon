@@ -139,8 +139,11 @@ Ingested when a feature wants them; never blocking.
 By-election results and local election results (drift signals between
 generals) · council composition · Democracy Club candidate lists ("who is
 actually standing", election time only) · published MRP estimates
-(calibration cross-checks for Second Foundation) · long-run historical
-election statistics (backtest context) · claimant count (economic pulse).
+(calibration cross-checks for Second Foundation) · historical
+final-polls-vs-results archive (per-party final-poll error at past
+generals — the input to Second Foundation's shy-response calibration,
+[03](03-architecture.md)) · long-run historical election statistics
+(backtest context) · claimant count (economic pulse).
 
 ### Dropped from the legacy registry
 
@@ -159,7 +162,9 @@ bar is the loader, not the idea.
 
 Each source ingests through a Cloudflare Workflow — durable, resumable,
 retried per step. One workflow instance per (source, attempt); completion
-events go onto a queue that Second Foundation and Radiant subscribe to.
+events go onto a queue that Second Foundation subscribes to. Radiant is not
+a subscriber: when a change warrants a new epoch, Second Foundation
+triggers Radiant's synthesis Workflow ([03](03-architecture.md)).
 
 ```mermaid
 flowchart LR
@@ -189,18 +194,25 @@ flowchart LR
   in R2 under `staged/`, one file per declared output table. The declared
   schema is enforced on write; a column of the wrong type or an unexpected
   header is a staging failure.
-- **Load** — staged tables are registered in the R2 Data Catalog as Iceberg
-  tables and the manifest's integrity checks run via R2 SQL: row counts in
-  range, key uniqueness, referential joins ("every seat code joins to
-  `constituency_spine` with coverage 1.0"). Only a fully green check-set
-  marks the source version *loaded* in the catalogue (D1).
+- **Load** — staged tables are committed to the R2 Data Catalog as Iceberg
+  tables. There is no Workers-native Iceberg writer, so the Workflow
+  invokes a small Container step — PyIceberg `add_files`/append — to commit
+  the staged Parquet into the Data Catalog. The manifest's integrity checks
+  then run via R2 SQL: row counts in range, key uniqueness, referential
+  joins ("every seat code joins to `constituency_spine` with coverage
+  1.0"). Only a fully green check-set marks the source version *loaded* in
+  the catalogue (D1).
 - **Derive** — versioned derived tables are rebuilt for any derivation whose
   inputs changed: `constituencies`, `baseline_shares`, `seat_facts`,
   `constituency_marginals`, `polling_now`. These are the tables the rest of
   Seldon actually reads; no service reads a raw source. Derivations are
   TypeScript + R2 SQL, versioned, and stamped with their input versions.
 
-Bucket and key conventions, catalogue DDL, and the Iceberg specifics live in
+R2 Data Catalog and R2 SQL are both open beta, and neither is reachable
+through a Workers binding: catalogue commits and queries authenticate with
+a Cloudflare API token held as a Worker secret
+([deployment](12-deployment.md) lists it). Bucket and key conventions,
+catalogue DDL, and the Iceberg specifics live in
 [the data model](10-data-model.md).
 
 ## Verification and the lock
@@ -231,17 +243,31 @@ someone signed for.*
 A **data version** is a content hash over the ordered set of loaded source
 versions for a world: `dataVersion = hash(worldId, {sourceId →
 contentHash})`. Any successful ingestion that changes a loaded source
-produces a new data version — cheap, frequent, immutable.
+produces a new data version — cheap, frequent, immutable. It exists for
+lineage: every derived number traces to one.
+
+Not every data version is a reason to resynthesise the population. A
+**population data version** is the narrower hash over only the
+population-input sources enumerated in the world's synthesis config —
+census marginals, boundaries, population estimates, address density:
+`populationDataVersion = hash(worldId, {populationSourceId →
+contentHash})`. A polling refresh mints a new data version every day but
+never a new population data version, and epoch identity hashes the
+population data version ([04](04-population.md)) — so identical population
+inputs always mean an identical epoch, however often polling moves.
+Whether a new population data version actually triggers synthesis is
+Second Foundation's trigger policy — routine marginal refreshes auto-run,
+boundary and config changes wait for owner approval — stated in
+[architecture](03-architecture.md).
 
 Lineage is recorded at every hop: derived table version → input source
 versions → raw artefact hashes. Because [epochs](04-population.md) are
-synthesised from a named data version, and every
+synthesised from a named population data version, and every
 [run](07-questions.md) records its epoch, any number on any outcome traces
 back — in one walk — to the exact bytes fetched from a named publisher on a
 named date. Terminus renders this as the lineage view in the catalogue
 ([09](09-terminus.md)); the ingestion queue event carrying the new data
-version is what lets Second Foundation decide a population-relevant change
-warrants a new epoch.
+version is what lets Second Foundation apply that trigger policy.
 
 ## Polling
 

@@ -43,13 +43,13 @@ phase starts until the previous phase's acceptance checks pass.**
 
 ## P0 — Streeling
 
-*Named for Streeling University, where psychohistory first left the
-blackboard.* Foundations: everything later phases stand on.
+P0 is named for Streeling University, where psychohistory first left the
+blackboard. Foundations: everything later phases stand on.
 
 **Scope**
 
 - Monorepo scaffold: the canonical tree from
-  [03-architecture](03-architecture.md); Bun workspaces, Turborepo, Biome,
+  [12-deployment](12-deployment.md); Bun workspaces, Turborepo, Biome,
   TypeScript project references, vitest-pool-workers wiring.
 - `packages/foundation` and `packages/dsl` ported as designed — domain
   types, Zod schemas, branded ids, error taxonomy; DSL grammar, parser and
@@ -63,7 +63,7 @@ blackboard.* Foundations: everything later phases stand on.
 - Terminus shell deployed: login, empty navigation, `@seldon/client`
   calling Demerzel.
 - CI/CD pipelines from [12-deployment](12-deployment.md) operational,
-  including PR preview deploys.
+  including PR previews for the DO-free apps.
 
 **Accept**
 
@@ -74,7 +74,10 @@ blackboard.* Foundations: everything later phases stand on.
 - DSL parses and lints the worked predicate examples from
   [06-scenarios](06-scenarios.md); a misspelt field fails with a typed
   error.
-- A PR shows preview URLs and a green pipeline.
+- A PR shows a green pipeline, with preview URLs for the DO-free apps
+  (Terminus, Demerzel, Vault) — DO-bearing apps are validated in workerd
+  tests and on the continuous staging deploy
+  ([12-deployment](12-deployment.md)).
 
 **Risks**
 
@@ -142,14 +145,15 @@ The replica becomes real: synthesis at full UK scale.
 - A full-UK epoch synthesised and published in staging; every seat passes
   marginal fidelity checks within tolerance; the failure list is empty and
   the check is loud when made to fail (fixture test).
-- Same `(worldId, dataVersion, synthConfig, seed)` → same `epochId` and
-  identical shard contents: reproducibility test green.
+- Same `(worldId, populationDataVersion, synthConfig, seed)` → same
+  `epochId` and identical shard contents: reproducibility test green.
 - Click-a-house at street zoom returns a dossier with per-attribute layer
   badges and provenance, interactively.
 - Explore answers count/breakdown over the full epoch at interactive
   speed; measured shard sizes recorded against the scale maths in
-  [03-architecture](03-architecture.md), and measured cost recorded
-  against the estimate in [12-deployment](12-deployment.md).
+  [03-architecture](03-architecture.md), and measured cost per epoch —
+  shard row writes especially — recorded against the estimate in
+  [12-deployment](12-deployment.md).
 
 **Risks**
 
@@ -160,7 +164,11 @@ The replica becomes real: synthesis at full UK scale.
 - Per-seat synthesis exceeds Workers CPU limits → one-seat spike first;
   split synthesis steps; Containers escape hatch exists but the default is
   not to need it.
-- Full-UK tile builds outgrow Workers → same escape hatch, same default.
+- Full-UK tile builds outgrow Workers — and the Containers escape hatch
+  itself caps at 4 vCPU / 12 GiB / 20 GB per instance
+  ([03-architecture](03-architecture.md)) → the tile build is chunked from
+  the start: per-region builds merged into one PMTiles archive, never a
+  single in-memory pass.
 
 ## P3 — Psychohistory
 

@@ -104,21 +104,22 @@ match — the v1 footgun where `agee > 50` silently matched nobody (see
 
 The registry is code (`@seldon/dsl`, typed, versioned with the epoch
 schema it describes). The v1 registry, abridged — the axis states what a
-field describes; the layer states where it comes from (see
-[population](04-population.md) for layer semantics):
+field describes; the origin states where it comes from, using the
+population layer names (`base`, `modelled`, `contextual`; semantics in
+[population](04-population.md)) for person, household, and area fields:
 
-| Field | Type | Axis | Values / range | Layer |
+| Field | Type | Axis | Values / range | Origin |
 | --- | --- | --- | --- | --- |
-| `sex` | enum | person | `male`, `female` | census |
-| `age` | number | person | 18–105 | census |
-| `ageBand` | enum | person | `"18-24"` … `"75+"` | census |
-| `qualification` | enum | person | `none`, `level1`, `level2`, `apprenticeship`, `level3`, `level4plus` | census |
-| `degree` | boolean | person | sugar for `qualification == level4plus` | census |
-| `activity` | enum | person | `employed`, `self-employed`, `unemployed`, `student`, `retired`, `inactive` | census |
+| `sex` | enum | person | `male`, `female` | base |
+| `age` | number | person | 18–105 | base |
+| `ageBand` | enum | person | `"18-24"` … `"75+"` | base |
+| `qualification` | enum | person | `none`, `level1`, `level2`, `apprenticeship`, `level3`, `level4plus` | base |
+| `degree` | boolean | person | sugar for `qualification == level4plus` | base |
+| `activity` | enum | person | `employed`, `self-employed`, `unemployed`, `student`, `retired`, `inactive` | base |
 | `registered` | boolean | person | on the electoral roll | modelled |
 | `income` | number | person | £/year | modelled |
-| `tenure` | enum | household | `owned`, `mortgage`, `social-rent`, `private-rent` | census |
-| `householdSize` | number | household | 1–8 | census |
+| `tenure` | enum | household | `owned`, `mortgage`, `social-rent`, `private-rent` | base |
+| `householdSize` | number | household | 1–8 | base |
 | `housePriceBand` | enum | household | quintile bands | modelled |
 | `energyBand` | enum | household | `a` … `g` | modelled |
 | `deprivation` | number | area | IMD quintile, 1 = most deprived | contextual |
@@ -130,6 +131,10 @@ field describes; the layer states where it comes from (see
 | `incumbent` | enum | seat | party id | derived |
 | `redWall`, `blueWall` | boolean | seat | committed reference lists in `@seldon/geo` | reference |
 
+Seat-axis origins are not population layers: `spine` and the `reference`
+lists are committed in `@seldon/geo`, and `derived` fields come from
+Encyclopedia's derived tables ([datasets](05-datasets.md)).
+
 Registries are world-scoped: a second world ships its own field set behind
 the same grammar.
 
@@ -138,8 +143,9 @@ the same grammar.
 ```text
 sex == male && age > 50 && !degree && income < 50k
 ```
-The legacy classic: older non-graduate men on lower incomes — a person-
-axis predicate that matches cells wholesale.
+The legacy classic: older non-graduate men on lower incomes. `sex` and
+`degree` follow cell axes; `age` and `income` cut inside bands, so cells
+match by exact fraction rather than wholesale ([engine](08-engine.md)).
 
 ```text
 nation == scotland && ageBand in ["18-24", "25-34"] && tenure == private-rent
@@ -238,11 +244,14 @@ Its parameter model is `onset` / `magnitude` / `decay` / predicate:
 }
 ```
 
-Because Seldon answers "if the election were held **today**", a Mule event
-contributes its *residue at the run date*: zero before `onset`, then
-`delta × 2^(−(runDate − onset) / halfLifeDays)` — so a standing question
-re-run on cadence shows a shock landing and fading across successive
-outcomes without anyone editing the scenario. v1 decay models:
+Because Seldon answers "if the election were held **today**", a Mule
+event contributes its *residue at the reference date* — the
+`referenceDate` pinned in the run's reproducibility tuple (below): zero
+before `onset`, then `delta × 2^(−(referenceDate − onset) /
+halfLifeDays)`, evaluated once at compile time. A standing question
+re-run on cadence pins a fresh reference date each run, so a shock lands
+and fades across successive outcomes without anyone editing the
+scenario. v1 decay models:
 `exponential` (half-life in days) and `none` (a permanent repricing, for
 structural events rather than news cycles). Magnitudes may touch several
 parties with opposite signs; `when` scopes who feels the shock, in the
@@ -282,7 +291,7 @@ believed. Polling mechanics live in [datasets](05-datasets.md).
 
 Scenarios are content-addressed. `scenarioHash` — the component of the
 reproducibility tuple `(worldId, epochOrForkId, scenarioHash,
-questionVersion, engineVersion, seed)` — is computed as:
+questionVersion, engineVersion, referenceDate, seed)` — is computed as:
 
 1. Resolve `extends` to the flattened effective document (so editing a
    parent honestly changes every child's identity).
@@ -291,7 +300,10 @@ questionVersion, engineVersion, seed)` — is computed as:
    designed, documented list — v1 hashed `description`, so fixing a typo
    changed run identity; that class of bug is closed by construction.
 3. Canonicalise (sorted keys, normalised numbers, no insignificant
-   whitespace) and SHA-256. The console displays the first 16 hex chars.
+   whitespace) and SHA-256. The scenario id is `sc_` plus the first
+   12 hex chars — `sc_9f2c8b1e07aa` — which is the form the console
+   displays; the full hash stays on the owning row
+   ([data model](10-data-model.md)).
 
 A scenario *name* in the console is a lineage of documents sharing a
 name; a run pins a hash, never a name. Published documents are immutable;

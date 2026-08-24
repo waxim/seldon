@@ -15,8 +15,35 @@ built yet — this is the deployment design that the phases in
 
 ## Monorepo tooling
 
-The repository is a Bun-workspaces monorepo (tree in
-[03-architecture](03-architecture.md)). One toolchain, root-configured:
+The repository is a Bun-workspaces monorepo. The canonical tree:
+
+```
+seldon/
+├── apps/
+│   ├── terminus/            # the console (Worker + static assets, React SPA)
+│   ├── demerzel/            # gateway: auth, routing, audit
+│   ├── radiant/             # population: worlds, epochs, forks, layers, shards
+│   ├── encyclopedia/        # datasets: manifests, ingestion, catalogue
+│   ├── psychohistory/       # engine: coordinators, compute, shocks
+│   ├── vault/               # scenarios, questions, runs, outcomes
+│   └── second-foundation/   # calibration, backtests, drift, schedules
+├── packages/
+│   ├── foundation/          # shared core: types, schemas, ids, errors
+│   ├── dsl/                 # predicate DSL: parser, registry, evaluator
+│   ├── parties/             # party registry
+│   ├── geo/                 # geography codes, lookups, region lists
+│   ├── client/              # typed API client (generated)
+│   └── ui/                  # Terminus design system
+├── infra/                   # Pulumi (TS): account-level resources per env
+├── data/                    # source manifests (committed); carried forward
+├── docs/                    # this design
+├── v2/ · LEGACY.md          # history, kept
+├── package.json             # Bun workspaces
+├── turbo.json               # task graph
+└── biome.json               # lint + format
+```
+
+One toolchain, root-configured:
 
 | Tool | Role |
 | --- | --- |
@@ -36,7 +63,7 @@ Root scripts (thin wrappers over `turbo run`):
 ```
 bun run check         # typecheck + lint + test — the PR gate
 bun run dev           # wrangler dev per app; local registry wires bindings
-bun run preview       # wrangler versions upload per app (CI, per PR)
+bun run preview       # wrangler versions upload, DO-free apps (CI, per PR)
 bun run deploy        # wrangler deploy per app, dependency-ordered (CI)
 bun run migrate       # d1 migrations apply, per service, per env (CI)
 bun run infra:up      # pulumi up in infra/ for the selected stack
@@ -123,8 +150,8 @@ routes; Second Foundation adds `triggers.crons`.
   // WorldRegistry: one object per world.
   "durable_objects": {
     "bindings": [
-      { "name": "SEAT_SHARD", "class_name": "SeatShard" },
-      { "name": "WORLD_REGISTRY", "class_name": "WorldRegistry" }
+      { "name": "SHARD_DO", "class_name": "SeatShard" },
+      { "name": "WORLD_REGISTRY_DO", "class_name": "WorldRegistry" }
     ]
   },
   // DO migrations: append-only deploy events (§ Migration discipline).
@@ -148,8 +175,11 @@ routes; Second Foundation adds `triggers.crons`.
     { "binding": "EPOCH_BUCKET", "bucket_name": "seldon-epochs-dev" }
   ],
 
-  // ── Hot caches: tile manifests, aggregate summaries ──────────────
-  "kv_namespaces": [{ "binding": "RADIANT_CACHE_KV", "id": "local" }],
+  // ── Hot caches (shared namespaces): tile manifests, aggregates ───
+  "kv_namespaces": [
+    { "binding": "TILES_KV", "id": "local" },
+    { "binding": "AGG_KV", "id": "local" }
+  ],
 
   // ── Synthesis fan-out: Radiant enqueues and consumes seat tasks ──
   "queues": {
@@ -169,8 +199,8 @@ routes; Second Foundation adds `triggers.crons`.
   // ── Durable orchestration: derive → IPF → validate → publish ─────
   "workflows": [
     {
-      "binding": "SYNTHESIS_WORKFLOW",
-      "name": "seldon-synthesis-dev",
+      "binding": "SYNTH_WF",
+      "name": "seldon-synth-wf-dev",
       "class_name": "SynthesisWorkflow"
     }
   ],
@@ -289,8 +319,14 @@ jobs:
       - uses: actions/checkout@v4
       - uses: oven-sh/setup-bun@v2
       - run: bun install --frozen-lockfile
-      # Upload a version per app WITHOUT deploying it: wrangler mints a
-      # preview URL per version; a bot comment posts them on the PR.
+      # Preview URLs exist only for DO-free apps (Terminus, Demerzel,
+      # Vault): Cloudflare mints none for a Worker implementing a
+      # Durable Object, and `versions upload` fails outright on a config
+      # carrying a DO migration. So preview uploads a version per
+      # DO-free app WITHOUT deploying it and a bot comment posts the
+      # URLs on the PR; the DO-bearing apps are validated per PR inside
+      # workerd (vitest-pool-workers) and exercised by the continuous
+      # staging deploy.
       - run: bun run preview
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -347,8 +383,12 @@ Two planes, neither in the repo:
 - **Runtime** — `wrangler secret put NAME --env <env>`, per app. By design
   there are few: service bindings need no credentials, and Access JWT
   validation uses public keys. Expected set: the smoke-test Access service
-  token (validated by Demerzel) and any per-source credentials Encyclopedia
-  might one day need for a gated Tier 3 source.
+  token (validated by Demerzel); the Cloudflare API token that
+  authenticates R2 Data Catalog commits and R2 SQL queries — neither is
+  reachable via a Workers binding, so the Iceberg Container step and the
+  load-stage checks carry it ([05-datasets](05-datasets.md)); and any
+  per-source credentials Encyclopedia might one day need for a gated
+  Tier 3 source.
 
 Local dev reads `.dev.vars` (gitignored; `.dev.vars.example` committed).
 Secrets never appear in `vars`, in Pulumi config plaintext (stack secrets
@@ -376,8 +416,9 @@ Two distinct mechanisms:
 
 - **Class-level** — the `migrations` array in `wrangler.jsonc`: append-only
   tags for `new_sqlite_classes`, renames, deletions. These are deliberate
-  deploy events; wrangler refuses to split traffic on a version containing
-  one (see Rollout), so they ship at 100% after a staging soak.
+  deploy events; `wrangler versions upload` refuses a config carrying one,
+  so they bypass the gradual path and ship via plain `wrangler deploy` at
+  100% after a staging soak (see Rollout).
 - **In-object schema** — each DO runs a code-driven, idempotent migration
   ladder on construction, keyed on a stored schema version
   (`PRAGMA user_version` style). It ships with the Worker version, so the
@@ -401,17 +442,25 @@ deployments**:
 3. Promote to 100%, or abort back to `old@100%` — both are one command and
    take effect in seconds.
 
-Constraints, stated honestly: versions containing DO class migrations
-cannot be split and deploy at 100% — the mitigation is the staging soak
-plus scheduling them deliberately. During a split, Durable Objects and
-in-flight Workflows each run a single version consistently; queue consumers
-may briefly span versions, so task payloads are versioned schemas
+Constraints, stated honestly: a release containing a DO class migration
+bypasses the gradual path entirely — `wrangler versions upload` refuses a
+config carrying one — and ships via plain `wrangler deploy` at 100%, after
+a staging soak and scheduled deliberately. During a split, each Durable
+Object runs a single pinned version until the next deployment. Workflows
+have no such pinning: an in-flight instance may resume on newer code with
+its completed steps replayed from cache, so step names, order and payload
+shapes must stay backwards-compatible across one release — the same
+expand/contract discipline D1 gets. Queue consumers may briefly span
+versions, so task payloads are versioned schemas
 ([10-data-model](10-data-model.md)).
 
 Rollback is `wrangler rollback` to the previous version, and it is safe
 *because* of the migration rules above: schemas are always one version more
 permissive than the code that reads them. D1 and DO schemas are never
-rolled back — only code is.
+rolled back — only code is. One hard boundary: a rollback cannot cross a
+DO lifecycle change — `wrangler rollback` refuses to target a version
+deployed before a class migration — which is one more reason those
+migrations ship as deliberate, scheduled deploys.
 
 ## Observability
 
@@ -437,17 +486,30 @@ precision):
   dominated by epoch synthesis and Monte Carlo runs — both cell-bounded by
   design ([08-engine](08-engine.md)), so tens of dollars per month at a
   few runs per day.
-- **R2** — epoch snapshots are single-digit GB each; retaining recent plus
-  quarterly epochs is tens of GB: single digits per month. Zero egress is
-  the reason map tiles live here.
+- **DO rows written** — the line item that scales with epoch cadence.
+  SQLite-backed DO storage bills roughly $1 per million rows written
+  beyond the 50M/month included, and deletes count as writes. A full-UK
+  epoch publish writes ~80M+ rows (households + persons + cells), and
+  evicting or replacing the superseded epoch's shards deletes as many
+  again — on the order of £60–130 per epoch swap. A monthly cadence keeps
+  that in the tens per month; the weekly cadence the synthesis trigger
+  policy permits ([04-population](04-population.md)) puts it in the low
+  hundreds.
+- **R2** — epoch snapshots are single-digit GB each, and every epoch's
+  snapshot is retained indefinitely ([04-population](04-population.md)) —
+  it is the cheap durable form; shard copies and tiles are rebuildable.
+  Even a year of weekly epochs is a few hundred GB: single digits per
+  month. Zero egress is the reason map tiles live here.
 - **D1, KV, Queues, Workflows** — minor at this scale.
 
-Expected total: tens of dollars per month, not hundreds. The first real
-epoch synthesis (P2) and the first sustained run load (P3) produce actual
-telemetry; those roadmap gates include recording measured cost against
-this estimate. Guardrails: the coordinator caps in-flight fan-out, DLQs
-stop retry storms, and Analytics Engine makes per-run cost visible before
-the invoice does.
+Expected total: tens of dollars per month at a monthly epoch cadence, low
+hundreds at weekly — the epoch swap, not request volume, is the dial worth
+watching. The first real epoch synthesis (P2) and the first sustained run
+load (P3) produce actual telemetry; the P2 gate records measured cost per
+epoch — row writes especially — and P3 per-run cost, against this estimate
+([13-roadmap](13-roadmap.md)). Guardrails: the coordinator caps in-flight
+fan-out, DLQs stop retry storms, and Analytics Engine makes per-run cost
+visible before the invoice does.
 
 Related: [03-architecture](03-architecture.md) ·
 [10-data-model](10-data-model.md) · [11-api](11-api.md) ·

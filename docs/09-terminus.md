@@ -65,7 +65,7 @@ the console is a shareable link.
 The **command palette** (⌘K) is the power surface: fuzzy navigation
 ("stroud" → the seat page; "E14001479" works too), verbs ("new scenario",
 "re-run standing question"), and — because it embeds the `@seldon/dsl`
-parser — typing a predicate like `age > 65 && tenure == social_rent`
+parser — typing a predicate like `age > 65 && tenure == social-rent`
 offers "Explore this filter" directly.
 
 ## The screens
@@ -73,8 +73,9 @@ offers "Explore this filter" directly.
 ### Overview — the First Crisis
 
 The home page is the standing election question, permanently answered:
-question + `current-polling` scenario + latest canon epoch, re-run on
-cadence by Second Foundation (see [questions](07-questions.md)).
+question + `current-polling` scenario + latest canon epoch, re-run daily
+at 06:00 UTC and on every `polling_now` refresh by Second Foundation's
+cron triggers (cadence in [questions](07-questions.md)).
 
 - **Headline band**: "Reform largest party — 8 short of a majority", with
   the 90% seat range beside every number. Point estimates never appear
@@ -82,6 +83,9 @@ cadence by Second Foundation (see [questions](07-questions.md)).
 - **Hemicycle**: the signature visual. 650 seats, party-coloured from
   `@seldon/parties`; seats whose call probability is under 80% render
   hatched, not solid — an uncertainty fringe rather than a firm claim.
+  Northern Ireland's 18 seats sit in the chamber in their own parties'
+  colours (`dup`, `sf`, `alliance`, `uup`, `sdlp`), carried results-based
+  under the named `ni-results-based` caveat ([questions](07-questions.md)).
 - **National map**: seat choropleth thumbnail, click-through to Population.
 - **Movement**: deltas since the previous run and previous epoch — seats
   changing hands, share drift, and *why* (which sources refreshed).
@@ -157,7 +161,7 @@ panel showing counts and breakdowns instead of persons.
 predicate DSL with full editor affordances: typed autocomplete from the
 field registry, inline diagnostics (an unknown field is a compile error,
 squiggled at the offending token — see [scenarios](06-scenarios.md) for
-the grammar), and a live match count that updates as you type.
+the grammar), and a live match count (budgets below).
 
 ```
 where: sex == male && age > 50 && !degree && income < 50000
@@ -172,12 +176,32 @@ areas so the filter is *visible geographically*), **breakdown**
 dossier). Any predicate built here can be saved onward as a question
 frame, a scenario rule `when`, or a bookmark — one DSL, every door.
 
+**Count budgets.** Live counts come in two classes; the mechanics belong
+to [the population doc](04-population.md). A predicate over banded and
+enum fields alone is *signature-aligned*: answered exactly from the
+national cell-aggregate table, target under 300 ms, evaluated on a
+debounced typing pause. A predicate touching continuous fields
+(`age > 50`, `income < 50000`) is *person-level*: a bounded shard
+fan-out streams progressive partial counts behind a progress affordance
+— or an async R2 SQL count with a spinner — seconds, never silently
+wrong. The explore bar takes whichever class the predicate demands and
+labels which path it is on; scenario rule cards and the question frame
+builder behave the same, except a card on the person-level path holds
+its last settled count with an explicit refresh rather than re-counting
+per edit; lint W003's tiny-frame check ([scenarios](06-scenarios.md))
+runs its count once at save time, where seconds are cheap.
+
 **Epochs & forks.** A management tab lists the canon's epochs (id, data
 version, synthesis config, fidelity report, artefacts) and all forks. The
 fork builder composes ordered skew ops — add/remove cohort, age-shift,
 scale band, tenure shift, registration rate — each op a card with a live
 estimated-impact count; lineage renders as a small graph from the parent
-epoch. Semantics live in [population](04-population.md).
+epoch. Browsing a fork is honest about its granularity: a persistent
+fork banner states that fork arithmetic is exact at cell and aggregate
+level, while the map and dossiers render the parent epoch's households
+with fork-adjusted cell leanings — household attributes stay the
+epoch's own, except for materialised add-cohort rows. Semantics live in
+[population](04-population.md).
 
 ### Datasets
 
@@ -351,9 +375,7 @@ Target: WCAG 2.2 AA, treated as an acceptance criterion, not a hope.
 - **Reduced motion** honoured as above; **zoom to 400%** reflows (panels
   stack, the map yields to the table view).
 
-## Related
-
-[Vision](01-vision.md) · [Lexicon](02-lexicon.md) ·
+Related: [Vision](01-vision.md) · [Lexicon](02-lexicon.md) ·
 [Architecture](03-architecture.md) · [Population](04-population.md) ·
 [Datasets](05-datasets.md) · [Scenarios](06-scenarios.md) ·
 [Questions](07-questions.md) · [Engine](08-engine.md) ·

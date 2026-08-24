@@ -24,19 +24,23 @@ is versioned; everything written is run-tuple-addressable.
 ## Cells
 
 A **cell** is the set of persons in one seat who share a demographic
-signature — the synthesis axes `sex × ageBand × qualification × tenure ×
-incomeBand × activity`. Cell members are indistinguishable to every
-resolver, so they resolve identically and the engine computes per cell —
-the load-bearing v1 trick ([D9](14-decisions.md)): ~28M households and
+signature — the IPF synthesis axes `sex × ageBand × qualification ×
+tenure × activity` plus the modelled income band (income is a layer,
+not a synthesis axis; [04-population](04-population.md) owns the split).
+On signature and context fields cell members are indistinguishable, so
+they resolve identically and the engine computes per cell — the
+load-bearing v1 trick ([D9](14-decisions.md)): ~28M households and
 ~50M adults collapse to **~50–200 cells per seat, ~40–80k nationally**,
 and a 1,000-iteration national run is seconds of arithmetic, not hours.
+Person-level fields inside a band are the one exception, handled by
+exact match fractions at plan compile (below).
 
 Cells are derived by Radiant at synthesis time and stored in each seat's
 shard DO alongside the households they summarise (schema in
 [10-data-model](10-data-model.md)). A cell row carries:
 
 ```
-cellId        world-scoped, sortable          e.g. uk:E14001156:c042
+cellId        world-scoped, sortable          e.g. uk:E14001156:cell:042
 seatId        the shard's constituency
 signature     the axis levels                 {sex, ageBand, qual, ...}
 weightAdults  persons aged 18+
@@ -55,17 +59,20 @@ Compilation collapses scenario + question + epoch metadata into a **plan**:
 a flat, closed structure a shard can execute with no further lookups. The
 compiler runs once per run, inside the coordinator; the plan is cached in
 KV under `hash(epochOrForkId, scenarioHash, questionVersion,
-engineVersion)` so repeated runs (new seeds, standing re-runs) skip it.
+engineVersion, referenceDate)` so repeated runs (new seeds, same-day
+standing re-runs) skip it.
 
 Compilation steps, in order:
 
 1. **Frame resolution** — the question's frame predicate → per-cell
    effective weights (zero = excluded).
-2. **Seat baselines** — per-seat 2024 shares (Encyclopedia's
-   `baseline_shares`) converted to log-odds; national/regional targets
-   applied as proportional swing *in log-odds space* (the v2 decision —
-   no share-space clamping pathology); Scotland and Wales swing against
-   their own polling series.
+2. **Seat baselines** — per-seat shares from the plan's pinned baseline
+   table, an explicit input recorded in the outcome's provenance
+   (default: Encyclopedia's `baseline_shares`, the 2024 results;
+   backtests pass `ge-2019-notional`), converted to log-odds;
+   national/regional targets applied as proportional swing *in log-odds
+   space* (the v2 decision — no share-space clamping pathology);
+   Scotland and Wales swing against their own polling series.
 3. **Rule effects** — every scenario rule's `when` predicate is evaluated
    against every cell signature + context; matching `effect`s fold into
    per-cell, per-party log-odds deltas and a turnout delta. O(rules ×
@@ -73,22 +80,45 @@ Compilation steps, in order:
 4. **Transfers** — tactical-transfer declarations compile to a per-cell
    row-stochastic transfer matrix (identity where no predicate matches).
 5. **Mule events** — each event's onset/magnitude/decay is evaluated at
-   the run's reference date to a scalar, then folded into the matching
-   cells' effect deltas like a rule.
+   the tuple's `referenceDate` to a scalar, then folded into the
+   matching cells' effect deltas like a rule.
 6. **Shock config** — sigma magnitudes copied in from Second Foundation's
    calibration config (never hand-set; scenario overrides are allowed but
    flagged as a caveat on the outcome).
+
+### Match fractions
+
+Banded and seat-level fields are uniform within a cell; continuous
+person-level fields (`age`, `income`) are not — `age > 50` cuts inside
+the 50–64 band. Wherever a frame or rule predicate touches a
+person-level field, steps 1 and 3 compute each cell's **match
+fraction**: the share of its members satisfying the predicate, counted
+once from the person rows in the seat shard's SQLite — exact, not
+estimated. The predicate then applies weighted by that fraction:
+
+```
+effectiveWeight[c] = weight[c] × matchFraction[c]        (frames)
+effect[c,p]       += delta[c,p] × matchFraction[c]       (rule effects)
+```
+
+So `age > 50 && income < 50k` is evaluable and exact in aggregate;
+within a cell, membership is fractional rather than uniform, and
+dossiers badge fractional matches as *partial*
+([04-population](04-population.md)). `deprivation` needs no fraction:
+it is seat-level context — uniform per seat, hence per cell — and the
+turnout resolver reads it on exactly that basis.
 
 A plan, abbreviated:
 
 ```jsonc
 {
   "planHash": "b3a1…",
+  "referenceDate": "2026-08-24",
   "resolver": { "id": "vote-intent", "version": 3 },
-  "parties": ["lab", "con", "ref", "ld", "grn", "snp", "pc", "oth"],
+  "parties": ["lab", "con", "reform", "ld", "green", "snp", "pc", "other"],
   "seats": { "E14001156": { "baseLogOdds": [/* per party */],
                             "region": "north-west" }, /* ×650 */ },
-  "cells": { "uk:E14001156:c042": {
+  "cells": { "uk:E14001156:cell:042": {
       "weight": 512, "effect": [0, -0.1, 0.4, 0, 0, 0, 0, 0],
       "turnoutDelta": -0.03, "transfer": null,
       "axes": { "ageBand": "50-64", "qual": "none" /* … */ } } },
@@ -119,8 +149,8 @@ v3 therefore draws, per iteration `i`:
 - one **national** shock per party — `η[p,i] ~ N(0, σ_nat)`;
 - one **regional** shock per (region × party) — `ρ[r,p,i] ~ N(0, σ_reg)`;
 - one **demographic** shock per (party × axis level) — e.g. one draw for
-  (`ref`, `qual=none`), applied to *every* matching cell in the country —
-  `δ[a,p,i] ~ N(0, σ_dem)`;
+  (`reform`, `qual=none`), applied to *every* matching cell in the
+  country — `δ[a,p,i] ~ N(0, σ_dem)`;
 - a small **per-seat** residual — `ε[s,p,i] ~ N(0, σ_seat)`.
 
 A demographic shock hits every matching cell identically, so it moves
@@ -153,6 +183,14 @@ Per-iteration seat votes feed the question's outcome functions: FPTP takes
 distribution; shares, crosstabs, and rollups are weighted sums over the
 same array. [07-questions](07-questions.md) owns the registry and caveats.
 
+Northern Ireland never reaches this maths in the standing question: the
+engine resolves the 632 GB seats demographically, while NI's 18 seats
+bypass cell resolution and enter at the seat tally, carried
+results-based from 2024 (scenario overrides permitted). The NI parties
+(`dup`, `sf`, `alliance`, `uup`, `sdlp`) join the seat-count
+distribution and hemicycle under the named caveat `ni-results-based`
+([07-questions](07-questions.md)).
+
 **Expected votes, not ballot sampling** — a documented tradeoff carried
 from v1/v2. At ~70k voters per seat, multinomial sampling noise is a few
 hundred votes of standard deviation — an order of magnitude below the
@@ -170,7 +208,7 @@ sequenceDiagram
     participant V as Vault
     participant C as Coordinator DO (per run)
     participant Q as SIM_TASKS_QUEUE
-    participant W as Consumer Worker
+    participant W as Radiant consumer Worker
     participant S as Shard DO (×650)
     participant T as Terminus (WebSocket)
 
@@ -193,6 +231,12 @@ sequenceDiagram
 
 Design points:
 
+- **The queue consumer is a Radiant Worker.** Queues deliver to consumer
+  Workers, never to DOs: the sim-task consumer lives in Radiant, drains
+  `SIM_TASKS_QUEUE`, and invokes its local shard DOs over RPC; shards
+  post partials back to the coordinator via service-binding RPC. So
+  Radiant's shards stay bound only inside Radiant and the trust boundary
+  holds ([03-architecture](03-architecture.md)).
 - **Shared shocks agree by construction.** National, regional, and
   demographic shocks must be identical across all 650 shards within an
   iteration. Rather than shipping precomputed vectors, the coordinator
@@ -208,13 +252,28 @@ Design points:
 - **Progress streaming.** The WebSocket emits seats-done counts and a
   running national headline with its convergence band, so Terminus shows
   the forecast settling live ([09-terminus](09-terminus.md)).
+- **Per-cell artefact for dossiers.** A standing run also persists a
+  `cells` table in its R2 artefacts — mean option distribution, mean
+  turnout, and matched rule/Mule ids per cell — and pushes a hot copy
+  (one row per cell, keyed by `runId`) to each seat shard's SQLite, so
+  dossier leanings join locally with Vault RPC as the fallback
+  ([04-population](04-population.md); layout in
+  [10-data-model](10-data-model.md)).
 
 ## Determinism and the RNG
 
 Determinism is a CI-grade contract: the run tuple
 `(worldId, epochOrForkId, scenarioHash, questionVersion, engineVersion,
-seed)` fully determines every output byte, regardless of Queue batching,
-retry order, or which iteration finishes first. Sequential RNGs break
+referenceDate, seed)` determines every per-iteration draw, and (tuple,
+iterations) determines every output byte — regardless of Queue batching,
+retry order, or which iteration finishes first. `referenceDate` is an
+ISO date pinned at launch (defaulting to the launch day); Mule-event
+decay and `current-polling` freshness are evaluated against it at
+compile time, so re-running a Mule-bearing scenario a week later is a
+new tuple, not a different answer to the same one. Iteration count sits
+outside the tuple by design: the counter-based RNG makes iteration `i`
+identical regardless of N, so raising N extends a run without rewriting
+it, and run dedupe compares tuple + iterations. Sequential RNGs break
 under parallelism — draw order becomes schedule-dependent — so the engine
 uses a **counter-based RNG** (Philox-style): a stateless keyed function
 
@@ -262,12 +321,17 @@ them.
 
 ## Backtests and calibration — execution mechanics
 
-A backtest is **just a run**: a historical epoch (2019 notional results on
-2024 boundaries), a scenario carrying the *observed* national/regional
-swing as targets, and a scoring outcome-function set — seat-call accuracy,
-seat MAE, per-party share error, and multi-class Brier over the full party
-probability vector (not modal-winner-only, a v1 sin). Three variants
-execute per backtest, all through the ordinary coordinator path:
+A backtest is **just a run**: the census-2021 epoch, the baseline table
+pinned to `ge-2019-notional` (2019 notional results on 2024 boundaries)
+in place of the default `baseline_shares`, a scenario carrying the
+*observed* national/regional swing as targets, and a scoring
+outcome-function set — seat-call accuracy, seat MAE, per-party share
+error, and multi-class Brier over the full party probability vector (not
+modal-winner-only, a v1 sin). The pinned baseline rides the ordinary
+plan input (step 2) and lands in the outcome's provenance; running 2019
+baselines over the census-2021 population is an anachronism, and the
+outcome discloses it as such. Three variants execute per backtest, all
+through the ordinary coordinator path:
 
 1. **The engine**, full plan;
 2. **UNS null** — a degenerate plan: uniform national swing, rules
