@@ -127,7 +127,8 @@ app's `wrangler.jsonc` env blocks and fails CI on drift.
 
 Radiant exercises nearly every binding type, so it is the worked example.
 Terminus differs by adding an `assets` block; Demerzel alone carries public
-routes; Second Foundation adds `triggers.crons`.
+routes; Second Foundation and Demerzel (audit export) add
+`triggers.crons`.
 
 ```jsonc
 // apps/radiant/wrangler.jsonc — the population service.
@@ -181,7 +182,9 @@ routes; Second Foundation adds `triggers.crons`.
     { "binding": "AGG_KV", "id": "local" }
   ],
 
-  // ── Synthesis fan-out: Radiant enqueues and consumes seat tasks ──
+  // ── Fan-out: Radiant enqueues + consumes its own synthesis tasks,
+  //    and drains Psychohistory's sim tasks to invoke shard DOs over
+  //    RPC (the queue-to-DO seam — see 03, 08) ──────────────────────
   "queues": {
     "producers": [
       { "binding": "SYNTH_TASKS_QUEUE", "queue": "seldon-synth-tasks-dev" }
@@ -192,6 +195,12 @@ routes; Second Foundation adds `triggers.crons`.
         "max_batch_size": 1,            // one seat per invocation
         "max_retries": 3,
         "dead_letter_queue": "seldon-synth-tasks-dlq-dev"
+      },
+      {
+        "queue": "seldon-sim-tasks-dev",
+        "max_batch_size": 1,
+        "max_retries": 3,
+        "dead_letter_queue": "seldon-sim-tasks-dlq-dev"
       }
     ]
   },
@@ -352,9 +361,12 @@ jobs:
       - run: bun install --frozen-lockfile
       - run: bun run infra:up --stack staging     # pulumi up, idempotent
       - run: bun run migrate --env staging        # D1, before any Worker
-      # Leaves deploy first so service bindings always resolve:
-      # radiant, vault, encyclopedia, psychohistory, second-foundation,
-      # then demerzel, then terminus. Turborepo's graph encodes it.
+      # Dependency-ordered where possible: encyclopedia and vault early,
+      # radiant after the services it binds, then second-foundation,
+      # demerzel, terminus. One cycle exists (vault ↔ psychohistory), so
+      # the first-ever deploy of a fresh env is a scripted two-pass
+      # bootstrap; steady-state redeploys don't care. Turborepo's graph
+      # encodes the order.
       - run: bun run deploy --env staging
       - run: bun run smoke --env staging          # health walk (below)
 
@@ -491,10 +503,10 @@ precision):
   beyond the 50M/month included, and deletes count as writes. A full-UK
   epoch publish writes ~80M+ rows (households + persons + cells), and
   evicting or replacing the superseded epoch's shards deletes as many
-  again — on the order of £60–130 per epoch swap. A monthly cadence keeps
-  that in the tens per month; the weekly cadence the synthesis trigger
-  policy permits ([04-population](04-population.md)) puts it in the low
-  hundreds.
+  again — on the order of $60–130 per epoch swap. That figure lands once
+  a month at a monthly cadence; the weekly cadence the synthesis trigger
+  policy permits ([04-population](04-population.md)) multiplies it by
+  four, into the mid hundreds.
 - **R2** — epoch snapshots are single-digit GB each, and every epoch's
   snapshot is retained indefinitely ([04-population](04-population.md)) —
   it is the cheap durable form; shard copies and tiles are rebuildable.
@@ -502,8 +514,8 @@ precision):
   month. Zero egress is the reason map tiles live here.
 - **D1, KV, Queues, Workflows** — minor at this scale.
 
-Expected total: tens of dollars per month at a monthly epoch cadence, low
-hundreds at weekly — the epoch swap, not request volume, is the dial worth
+Expected total: on the order of a hundred dollars per month at a monthly
+epoch cadence, several hundred at weekly — the epoch swap, not request volume, is the dial worth
 watching. The first real epoch synthesis (P2) and the first sustained run
 load (P3) produce actual telemetry; the P2 gate records measured cost per
 epoch — row writes especially — and P3 per-run cost, against this estimate

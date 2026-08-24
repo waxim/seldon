@@ -101,7 +101,7 @@ fork).
 
 ```
 ┌────────────────────────────────────────────────────────────────┐
-│ [uk ▾]  [epoch 2026-07 ▾]  [layer: none ▾]   [DSL filter bar ]│
+│ [uk ▾]  [epoch 14 Jul 26 ▾] [layer: none ▾]  [DSL filter bar ]│
 ├──────────────────────────────────────────────┬─────────────────┤
 │                                              │  DOSSIER        │
 │                map / explore                 │  12 Mill Rd (s) │
@@ -192,7 +192,10 @@ per edit; lint W003's tiny-frame check ([scenarios](06-scenarios.md))
 runs its count once at save time, where seconds are cheap.
 
 **Epochs & forks.** A management tab lists the canon's epochs (id, data
-version, synthesis config, fidelity report, artefacts) and all forks. The
+version, synthesis config, fidelity report, artefacts) and all forks.
+Pickers label an epoch by its published date, with the `ep_` id shown on
+hover and in this tab — dates are how people think of epochs; ids are
+how the system addresses them. The
 fork builder composes ordered skew ops — add/remove cohort, age-shift,
 scale band, tenure shift, registration rate — each op a card with a live
 estimated-impact count; lineage renders as a small graph from the parent
@@ -216,7 +219,7 @@ substance).
   → typed confirmation, audited).
 - **Lineage graph**: derived table → sources → versions, an interactive
   DAG entered from any provenance link anywhere in the console.
-- **Needs a hand**: the queue of `manual/needs-url` sources — per-source
+- **Needs a hand**: the queue of `manual: true` sources — per-source
   instructions and a guided upload through the same verify/stage pipeline.
 - **Ingest runs**: live and historical Workflow executions, stage by stage
   (fetch → verify → stage → load → derive), with loud failure detail.

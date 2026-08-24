@@ -102,15 +102,15 @@ the epoch loudly — unfinished seats listed — if the count never closes
 
 ```mermaid
 flowchart TD
-    A[Derive constituency marginals\nper seat, per data version] --> B[Seed joint distribution]
-    B --> C[IPF: fit age-sex x qualification\nx tenure x activity to marginals]
-    C --> D[Integerise + deal persons\nfrom the fitted joint]
-    D --> E[Household packing against\nsize + composition marginals]
-    E --> F[Attribute layers:\nmodelled + contextual]
+    A[Derive constituency marginals<br/>per seat, per data version] --> B[Seed joint distribution]
+    B --> C[IPF: fit age-sex x qualification<br/>x tenure x activity to marginals]
+    C --> D[Integerise + deal persons<br/>from the fitted joint]
+    D --> E[Household packing against<br/>size + composition marginals]
+    E --> F[Attribute layers:<br/>modelled + contextual]
     F --> G[Density-weighted placement]
-    G --> H{Per-seat validation\nwithin tolerance?}
-    H -- yes --> I[Publish epoch:\nshards live + R2 snapshot\n+ Iceberg + tile build]
-    H -- no --> X[Fail loudly:\nepoch not published]
+    G --> H{Per-seat validation<br/>within tolerance?}
+    H -- yes --> I[Publish epoch:<br/>shards live + R2 snapshot<br/>+ Iceberg + tile build]
+    H -- no --> X[Fail loudly:<br/>epoch not published]
 ```
 
 Stage by stage:
@@ -138,7 +138,8 @@ Stage by stage:
    outnumbers the graduate" is an answerable predicate.
 5. **Layers.** Modelled and contextual attributes attach (next section):
    income conditioned on tenure + qualification + region; registration
-   probability by age from Electoral Commission research; area joins.
+   probability by age, anchored to the `electoral-register` counts
+   ([05-datasets](05-datasets.md)); area joins.
 6. **Placement.** Synthetic coordinates, density-weighted (below).
 7. **Validation, then publish.** Per seat: every fitted marginal matches
    its census table within the configured tolerance (catching
@@ -202,9 +203,11 @@ export const income = defineLayer({
   kind: "modelled",
   target: "person",
   field: { key: "income", type: "int", unit: "GBP/yr" },
-  inputs: ["census2021-tenure", "census2021-qualifications", "ons-earnings"],
+  inputs: ["census-2021-ew:tenure", "census-2021-ew:qualifications",
+           "small-area-income"],
   draw: drawIncome, // (person, household, seatFacts, rng) => value
-  validation: { holdout: "ons-regional-income", tolerance: 0.05 },
+  // spatial holdout: fit on 80% of small-area-income MSOAs, check the rest
+  validation: { holdout: "small-area-income:reserved", tolerance: 0.05 },
 });
 ```
 
@@ -284,12 +287,12 @@ Its full shape (JSON, abridged values, real structure):
     "size": 2, "composition": "couple-no-children",
     "attributes": [
       { "key": "tenure", "value": "owned", "layer": "base",
-        "provenance": { "source": "census2021-tenure",
+        "provenance": { "source": "census-2021-ew", "table": "tenure",
                         "dataVersion": "dv_3e8b09c47f21", "method": "ipf+packing" } },
       { "key": "energyRating", "value": "D", "layer": "modelled",
         "provenance": { "layerId": "energy-rating@1", "holdout": "passed" } },
       { "key": "imdQuintile", "value": 4, "layer": "contextual",
-        "provenance": { "source": "imd2019", "joinedAt": "L3" } }
+        "provenance": { "source": "imd-england", "joinedAt": "L3" } }
     ]
   },
   "persons": [
@@ -310,7 +313,8 @@ Its full shape (JSON, abridged values, real structure):
         "distribution": { "lab": 0.31, "con": 0.22, "reform": 0.24,
                           "ld": 0.11, "green": 0.07, "dont-know": 0.05 },
         "turnout": 0.74,
-        "caveats": ["turnout-weighting@2", "dk-reallocation@1"]
+        "caveats": ["turnout-weighting@3", "shy-response@2",
+                    "dont-know-reallocation@1"]
       }
     }
   ],

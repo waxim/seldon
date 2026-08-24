@@ -104,17 +104,19 @@ effect[c,p]       += delta[c,p] × matchFraction[c]       (rule effects)
 So `age > 50 && income < 50k` is evaluable and exact in aggregate;
 within a cell, membership is fractional rather than uniform, and
 dossiers badge fractional matches as *partial*
-([04-population](04-population.md)). `deprivation` needs no fraction:
-it is seat-level context — uniform per seat, hence per cell — and the
-turnout resolver reads it on exactly that basis.
+([04-population](04-population.md)). `deprivation` works the same way:
+it is joined onto households from LSOA-level indices
+([04-population](04-population.md)), so it varies within a seat, and
+predicates over it — including the turnout resolver's logistic term —
+take match fractions like any other household attribute.
 
 A plan, abbreviated:
 
 ```jsonc
 {
-  "planHash": "b3a1…",
+  "planHash": "pl_b3a1f2c9d804",
   "referenceDate": "2026-08-24",
-  "resolver": { "id": "vote-intent", "version": 3 },
+  "resolver": { "name": "vote-intent", "version": 2 },
   "parties": ["lab", "con", "reform", "ld", "green", "snp", "pc", "other"],
   "seats": { "E14001156": { "baseLogOdds": [/* per party */],
                             "region": "north-west" }, /* ×650 */ },

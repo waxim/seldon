@@ -99,8 +99,9 @@ CREATE TABLE worlds (
 );
 
 CREATE TABLE epochs (
-  epoch_id TEXT PRIMARY KEY,       -- 'ep_…'; untruncated hash alongside
-  world_id TEXT NOT NULL REFERENCES worlds, full_hash TEXT NOT NULL,
+  epoch_id TEXT PRIMARY KEY,       -- 'ep_…'
+  full_hash TEXT NOT NULL,         -- the untruncated content hash
+  world_id TEXT NOT NULL REFERENCES worlds,
   data_version TEXT NOT NULL,      -- 'dv_…' full lineage (Encyclopedia)
   population_data_version TEXT NOT NULL,  -- 'dv_…' epoch-hash input (04)
   synth_config TEXT NOT NULL, seed INTEGER NOT NULL,
@@ -174,6 +175,7 @@ CREATE TABLE data_versions (
 ```sql
 CREATE TABLE scenarios (
   scenario_hash TEXT PRIMARY KEY,  -- 'sc_…' (cosmetic fields excluded)
+  full_hash TEXT NOT NULL,         -- the untruncated SHA-256 (see 06)
   world_id TEXT NOT NULL, slug TEXT NOT NULL, version INTEGER NOT NULL,
   doc TEXT NOT NULL,               -- JSON scenario document (see 06)
   extends TEXT,                    -- parent scenario_hash | NULL
@@ -401,7 +403,7 @@ There is no Workers-native way to write an Iceberg table: a commit is
 coordinated metadata and manifest writes that only a real Iceberg
 client performs. The ingestion and epoch-publish Workflows therefore
 invoke a small Container step — PyIceberg `add_files`/append — to
-commit staged and snapshot Parquet into the catalog
+commit staged and snapshot Parquet into the Data Catalog
 ([05-datasets](05-datasets.md)). Catalog operations and R2 SQL queries
 authenticate with a Cloudflare API token held as a Worker secret
 ([12-deployment](12-deployment.md)), not a binding.
@@ -425,13 +427,12 @@ GROUP BY p.seat_id, p.income_band;
 
 Epoch-over-epoch drift (registered adults per seat between two epoch
 ids) is the same pattern filtered to two partitions. Honest caveat:
-R2 Data Catalog and R2 SQL are open-beta products. The SQL surface now
-covers these queries — GROUP BY, JOINs, CTEs and window functions are
-supported — but the grammar may still change. The Parquet layout
-therefore stays engine-neutral (plain Hive-partitioned files under
-stable keys), so the fallback is mechanical: the same queries from
-DuckDB in a Container ([03-architecture](03-architecture.md)) over the
-same objects. Analytics is a consumer of the layout, never its owner.
+R2 Data Catalog and R2 SQL are open-beta products. The SQL surface
+covers these queries (GROUP BY, joins, CTEs, window functions), but as
+a beta the grammar may change. The Parquet layout therefore stays
+engine-neutral (plain Hive-partitioned files under stable keys), so
+the fallback is mechanical: a Container-hosted query engine over the
+same objects, per decision [D4](14-decisions.md). Analytics is a consumer of the layout, never its owner.
 
 ## KV namespaces
 
@@ -466,7 +467,8 @@ by `infra/` ([12-deployment](12-deployment.md)). Rules:
   `EPOCH_BUCKET`, `TILE_BUCKET` (write: tile builds), `SHARD_DO`,
   `WORLD_REGISTRY_DO`, `SYNTH_WF`, `SYNTH_TASKS_QUEUE`; Encyclopedia →
   `ENCYCLOPEDIA_DB`, `DATASETS_BUCKET`, `INGEST_WF`; Psychohistory →
-  `COORDINATOR_DO`, `SIM_TASKS_QUEUE` (+ `SIM_TASKS_DLQ`), `PLANS_KV`;
+  `COORDINATOR_DO`, `SIM_TASKS_QUEUE` (+ `SIM_TASKS_DLQ`), `PLANS_KV`,
+  `RUN_BUCKET` (write: run artefacts, per 08);
   Vault → `VAULT_DB`, `RUN_BUCKET`; Demerzel → `DEMERZEL_DB`,
   `ACCESS_KEYS_KV`, `AUDIT_BUCKET`; Terminus → `TILE_BUCKET` (read:
   tile serving); shared → `POLLS_KV`, `AGG_KV`, `TILES_KV`, `FLAGS_KV`.

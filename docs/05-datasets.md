@@ -57,7 +57,7 @@ fetch:
   url: https://electionresults.parliament.uk/general-elections/6/candidacies.csv
   expect:                 # checked at fetch time — a bot-wall HTML page
     contentType: text/csv #   saved as data.csv fails here, not three
-    minBytes: 500_000     #   stages later
+    minBytes: 500000      #   stages later
 stage:
   recipe: recipes/ge-results-2024.ts    # typed TypeScript transform
   outputs:
@@ -84,8 +84,8 @@ and a hand-downloaded file uploaded through Terminus enters the pipeline at
 the verify stage, identically to a fetched artefact — the v2 `recover`
 concept, now a console flow.
 
-Staging recipes are TypeScript modules (there is no DuckDB in v3 — see
-[decision D4](14-decisions.md)); the common cases (CSV select/rename/cast,
+Staging recipes are TypeScript modules (no DuckDB anywhere in the
+runtime or staging path — see [decision D4](14-decisions.md)); the common cases (CSV select/rename/cast,
 spreadsheet sheet extraction, zip members) are one-liners over shared recipe
 helpers, and the genuinely weird sources (paginated API walkers, multi-sheet
 workbooks) are ordinary code with ordinary tests.
@@ -174,7 +174,7 @@ flowchart LR
   S -->|typed Parquet| L[load]
   L -->|checks pass| D[derive]
   D --> C[(catalogue + new dataVersion)]
-  F -. manual source .-> H[/"needs a hand" queue/]
+  F -. manual source .-> H[/"the 'needs a hand' queue"/]
   H -. console upload .-> V
   V -. mismatch .-> X[loud failure + alert]
   L -. check fails .-> X

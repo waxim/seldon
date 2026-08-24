@@ -43,7 +43,7 @@ one-line summaries; the real definitions live in
 | **Terminus** | `apps/terminus` | The Foundation's home world | The web console — the entire UI. Browse the replica, manage datasets, scenarios, questions, runs, outcomes. |
 | **Demerzel** | `apps/demerzel` | Eto Demerzel, the quiet hand behind the throne | API gateway: auth (validates Cloudflare Access JWTs), routing to services via service bindings, rate limits, audit log. |
 | **Radiant** | `apps/radiant` | The Prime Radiant, the device that holds the Plan's equations | The population service. Owns worlds, the canon replica, epochs, forks, layers, cells, and the household dossier. The living model of society. |
-| **Encyclopedia** | `apps/encyclopedia` | The Encyclopedia Galactica | The dataset service: source manifests, ingestion workflows (fetch → stage → load), the catalogue, provenance, versioning. |
+| **Encyclopedia** | `apps/encyclopedia` | The Encyclopedia Galactica | The dataset service: source manifests, ingestion workflows (fetch → verify → stage → load → derive), the catalogue, provenance, versioning. |
 | **Psychohistory** | `apps/psychohistory` | The science itself | The simulation engine: scenario compilation, correlated-shock Monte Carlo, per-seat fan-out, aggregation. Pure compute; owns no long-lived domain state. |
 | **Vault** | `apps/vault` | The Time Vault, where Seldon's predictions are revealed | The asking domain: scenarios, questions, runs, outcomes. The archive of every prediction ever made. |
 | **Second Foundation** | `apps/second-foundation` | The hidden guardians who keep the Plan on course | Calibration, backtests, drift monitoring, data-freshness watch, scheduled replica refreshes. Quietly corrects the model. |

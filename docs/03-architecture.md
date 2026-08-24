@@ -204,7 +204,7 @@ Execution mechanics of backtests live with the engine in
 | **Workflows** | Durable multi-step orchestration: ingestion (fetch → verify → stage → load → derive), epoch synthesis (derive marginals → per-seat IPF → validate → publish), run execution envelope, calibration sweeps. Retries + resumability for free. |
 | **KV** | Read-mostly caches: poll-of-polls, compiled scenario plans, hot aggregates, tile manifests, feature flags. |
 | **Cron Triggers** | Second Foundation's watch: polling refresh cadence, source-freshness checks, drift checks, standing-question re-runs. |
-| **Containers** | Escape hatch for compute that outgrows Workers CPU limits: full-UK tile builds, very large calibration sweeps, the Iceberg catalog commit step. Attached via DOs, still deployed from the monorepo. The largest instance is 4 vCPU / 12 GiB memory / 20 GB disk, so the full-UK tile build is a chunked pipeline — per-region tile builds merged into one PMTiles archive, never a single in-memory pass. Default is *not* to need them. |
+| **Containers** | Escape hatch for compute that outgrows Workers CPU limits: full-UK tile builds, very large calibration sweeps, the Data Catalog commit step. Attached via DOs, still deployed from the monorepo. The largest instance is 4 vCPU / 12 GiB memory / 20 GB disk, so the full-UK tile build is a chunked pipeline — per-region tile builds merged into one PMTiles archive, never a single in-memory pass. Default is *not* to need them. |
 | **Workers AI / AI Gateway** | Roadmap-tier: natural-language → DSL question drafting; persona interviews grounded in a dossier ("ask this household why"). Always labelled as generative, never part of the statistical path. |
 | **Vectorize** | Roadmap-tier: semantic search over the catalogue and question archive. |
 | **Analytics Engine** | Operational telemetry: run timings, shard health, ingestion stats. |
@@ -233,7 +233,7 @@ The canon advances only through this flow; nothing edits it in place.
    publish. Detail in [04-population](04-population.md).
 5. Publishing an epoch means: shard DO SQLite becomes live for the new
    epoch; a Parquet snapshot partitioned by seat lands in R2; the
-   Workflow's Container step commits the snapshot to the Iceberg catalog;
+   Workflow's Container step commits the snapshot to R2 Data Catalog;
    a tile build renders new PMTiles. The canon has advanced; the previous
    epoch remains addressable.
 
@@ -290,7 +290,8 @@ the engine's: [08-engine](08-engine.md). Outcome functions and caveats:
    derivable from the id — no lookup hop).
 4. The shard assembles the dossier: attributes by layer with per-attribute
    provenance, the household's persons, and modelled leanings joined from
-   the latest standing run's cell probabilities via Vault.
+   its local copy of the latest standing run's per-cell results (pushed to
+   every shard at run completion), falling back to Vault RPC when absent.
 5. The dossier panel renders. Dossier content model:
    [04-population](04-population.md); panel UX: [09-terminus](09-terminus.md).
 
@@ -309,7 +310,7 @@ The arithmetic that makes the design honest, usable in any doc:
 | Cells per seat | ~50–200 | seat × demographic signature |
 | Cells nationally | ~40–80k | 650 × cells-per-seat |
 | Fan-out per run | 650 tasks | one Queue message per seat |
-| Per-shard run cost | seconds of CPU | 1,000 iterations × ~150 cells × a handful of options ≈ 10⁵–10⁶ softmax evaluations |
+| Per-shard run cost | tens of ms of CPU | 1,000 iterations × ~150 cells × a handful of options ≈ 10⁵–10⁶ softmax evaluations ([08-engine](08-engine.md) envelope) |
 | Epoch snapshot | single-digit GB | Parquet in R2, partitioned by seat |
 
 The critical property: a 1,000-iteration run touches **cells, not

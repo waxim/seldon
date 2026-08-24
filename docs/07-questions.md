@@ -119,9 +119,10 @@ resolve(cell, instrument, compiledScenario, draw): Distribution<OptionId>
 | `turnout` | probability of voting | logistic model over age, tenure, deprivation, registration |
 
 Resolvers are pinned by `name@version` with typed `params` (e.g. a
-softmax temperature), and a question declares which resolver families its
-instrument accepts — `fptp-seats` over a likert instrument is a lint
-error, not a surprise. The resolution maths, correlated shock draws, and
+softmax temperature), and a question declares which resolver families
+and outcome functions its instrument accepts — `vote-intent` over a
+likert instrument, or `fptp-seats` over anything but a single-choice
+ballot, is a lint error, not a surprise. The resolution maths, correlated shock draws, and
 determinism contract live in [the engine](08-engine.md).
 
 ## Outcome functions

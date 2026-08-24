@@ -98,7 +98,7 @@ The trust-builder: the data pipeline proven before anything sits on it.
   results, 2019 notionals, constituency spine, electorate/turnout, polling
   (scraper flagged `fragile`, manual entry as source of truth).
 - Derived tables: `constituencies`, `baseline_shares`, `seat_facts`,
-  `polling_now`; staged Parquet in R2, registered in the Iceberg catalogue.
+  `polling_now`; staged Parquet in R2, registered in R2 Data Catalog.
 - Data versions + lineage in D1/R2 (the `MANIFEST.lock` concept).
 - Terminus Datasets screens: catalogue, freshness, checksums, lineage
   graph, the "needs a hand" queue with upload/recover.

@@ -230,7 +230,7 @@ export class RadiantEntrypoint extends WorkerEntrypoint<RadiantEnv> {
 
 ```ts
 // apps/demerzel — wrangler.jsonc binds
-//   { "binding": "RADIANT", "service": "radiant",
+//   { "binding": "RADIANT", "service": "seldon-radiant-dev"  // env-resolved, per 12's naming rule,
 //     "entrypoint": "RadiantEntrypoint" }
 interface DemerzelEnv {
   RADIANT: Service<
@@ -298,7 +298,7 @@ unmapped identities are denied. Three roles in v1
 | Read population, catalogue, outcomes, calibration | ✓ | ✓ | ✓ |
 | Subscribe to run progress | ✓ | ✓ | ✓ |
 | Author scenarios/questions; create forks; launch and cancel runs | — | ✓ | ✓ |
-| Trigger ingests; upload `needs-url` sources | — | ✓ | ✓ |
+| Trigger ingests; upload `manual: true` sources | — | ✓ | ✓ |
 | Repin source checksums; manage worlds and layers | — | — | ✓ |
 | Manage the role map; read the audit log | — | — | ✓ |
 
