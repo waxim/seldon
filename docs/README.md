@@ -44,6 +44,14 @@ The documents are numbered for a front-to-back read:
 14. **[Decisions](14-decisions.md)** — the ADR ledger: every load-bearing
     choice, its alternatives, and what would make us revisit it.
 
+## Phase checklists
+
+The [roadmap](13-roadmap.md) sets the gates; each phase's checklist is
+committed beside it and ticked with evidence:
+
+- **[P0 — Streeling](p0-acceptance.md)** — the monorepo, the packages, the
+  infrastructure project and the pipelines.
+
 ## Shortcuts by concern
 
 - *"How do I click a house and see everything about it?"* —

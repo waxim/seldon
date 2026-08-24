@@ -1,0 +1,21 @@
+{
+  "extends": "./tsconfig.base.json",
+  "files": [],
+  "references": [
+    { "path": "packages/foundation" },
+    { "path": "packages/parties" },
+    { "path": "packages/geo" },
+    { "path": "packages/dsl" },
+    { "path": "packages/client" },
+    { "path": "packages/ui" },
+    { "path": "apps/radiant" },
+    { "path": "apps/encyclopedia" },
+    { "path": "apps/vault" },
+    { "path": "apps/psychohistory" },
+    { "path": "apps/second-foundation" },
+    { "path": "apps/demerzel" },
+    { "path": "apps/terminus" },
+    { "path": "scripts" },
+    { "path": "infra" }
+  ]
+}

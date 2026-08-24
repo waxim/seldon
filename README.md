@@ -24,13 +24,15 @@ inventor of psychohistory, the fictional science of predicting mass
 behaviour from the statistical regularities of individuals. The services
 that make up the system carry names from the same universe.
 
-## Status: design phase
+## Status: P0 — Streeling
 
-**Nothing in this repository is built yet.** This repo currently contains
-the complete design for Seldon v3 — the documents in [`docs/`](docs/) are
-the contract the build will be held to. When construction starts, this
-repository becomes the monorepo: application code, shared packages, and
-all infrastructure code live here.
+The design in [`docs/`](docs/) is complete and remains the contract. The
+monorepo now exists alongside it: seven Worker apps, six shared packages,
+the Pulumi infrastructure project and the full CI/CD pipeline are
+scaffolded and green. **No domain logic is built yet** — the apps answer
+health, prove their bindings and hold their schemas; every screen in the
+console says which phase fills it. What P0 delivers, and what still gates
+P1, is tracked in [`docs/p0-acceptance.md`](docs/p0-acceptance.md).
 
 Two earlier attempts inform this design and are kept as history:
 [`LEGACY.md`](LEGACY.md) (v1 — a CLI + services build) and [`v2/`](v2/)
@@ -112,7 +114,40 @@ Read in order for the full picture, or jump to what you need:
 | [13 · Roadmap](docs/13-roadmap.md) | Build phases P0–P5 with acceptance criteria |
 | [14 · Decisions](docs/14-decisions.md) | The ADR ledger — why it is the way it is |
 
-## The monorepo (as designed)
+## Working in the monorepo
+
+```bash
+bun install
+bun run check              # typecheck + lint + test — the PR gate
+bun run dev                # the whole stack locally (wrangler dev per app)
+bun run build              # the Terminus SPA; everything else ships source
+bun run deploy:dry-run     # bundle + validate every app, no account needed
+```
+
+Tests run **inside workerd** with Miniflare-simulated bindings, and each
+service's D1 is booted from its own migration chain, so a broken migration
+fails the pull request rather than the deploy.
+
+Infrastructure is two layers with one seam
+([`docs/12-deployment.md`](docs/12-deployment.md)):
+
+```bash
+bun run infra:up --env staging   # pulumi up, then sync stack outputs
+bun run gen:wrangler             # regenerate wrangler.jsonc from the table
+bun run infra:check              # fail on any drift between the two layers
+bun run migrate --env staging    # D1 migration chains, before any deploy
+bun run deploy --env staging     # ordered deploy
+bun run smoke --env staging      # health-walk what was just deployed
+```
+
+Every app's `wrangler.jsonc` is generated from the single resource table in
+`@seldon/foundation` (`RESOURCES`), so a binding, a physical resource name
+and the Pulumi resource that backs it cannot drift apart unnoticed. Before
+the first `pulumi up`, the generated configs carry `pulumi:` placeholder
+ids and `config/environments.json` carries `.example` hostnames;
+`infra:check --strict`, which the deploy workflow runs, refuses both.
+
+## The monorepo
 
 ```
 seldon/
@@ -126,14 +161,17 @@ seldon/
 │   └── second-foundation/   # calibration, backtests, drift, schedules
 ├── packages/
 │   ├── foundation/          # shared core: types, schemas, ids, errors
-│   ├── dsl/                 # predicate DSL: parser, registry, evaluator
+│   ├── dsl/                 # predicate DSL: typed field registry, lint
 │   ├── parties/             # party registry
 │   ├── geo/                 # geography codes, lookups, region lists
-│   ├── client/              # typed API client (generated)
+│   ├── client/              # typed API client over the route registry
 │   └── ui/                  # Terminus design system
 ├── infra/                   # Pulumi (TypeScript): account-level resources
+├── scripts/                 # deploy, migrate, preview, smoke, infra:check
+├── config/                  # per-environment account facts; test stubs
 ├── data/                    # source manifests (committed)
 ├── docs/                    # this design
+├── .github/workflows/       # ci.yml (PRs) · deploy.yml (staging, release)
 ├── v2/ · LEGACY.md          # history, kept
 ├── package.json             # Bun workspaces
 ├── turbo.json               # task graph

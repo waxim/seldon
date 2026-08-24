@@ -30,3 +30,20 @@ coverage/
 .idea/
 .vscode/*
 !.vscode/extensions.json
+
+# monorepo build + tooling output
+.turbo/
+.wrangler/
+apps/*/dist/
+packages/*/dist/
+infra/dist/
+scripts/dist/
+preview-urls.md
+
+# local runtime secrets (see .dev.vars.example)
+.dev.vars
+.dev.vars.*
+!.dev.vars.example
+
+# pulumi
+Pulumi.*.yaml.bak

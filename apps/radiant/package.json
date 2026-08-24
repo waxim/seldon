@@ -1,0 +1,17 @@
+{
+  "name": "@seldon/radiant",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --build",
+    "lint": "biome check src test",
+    "test": "vitest run",
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy"
+  },
+  "dependencies": {
+    "@seldon/foundation": "workspace:*",
+    "@seldon/geo": "workspace:*"
+  }
+}

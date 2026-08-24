@@ -1,0 +1,18 @@
+{
+  "name": "@seldon/demerzel",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --build",
+    "lint": "biome check src test",
+    "test": "vitest run",
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy"
+  },
+  "dependencies": {
+    "@seldon/client": "workspace:*",
+    "@seldon/foundation": "workspace:*",
+    "hono": "^4.10.3"
+  }
+}

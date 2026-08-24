@@ -1,0 +1,20 @@
+{
+  "name": "@seldon/client",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./routes": "./src/routes.ts"
+  },
+  "types": "./src/index.ts",
+  "scripts": {
+    "typecheck": "tsc --build",
+    "lint": "biome check src test",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@seldon/foundation": "workspace:*",
+    "zod": "^4.1.12"
+  }
+}

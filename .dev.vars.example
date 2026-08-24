@@ -1,0 +1,13 @@
+# Local runtime secrets for `wrangler dev`. Copy to `.dev.vars` in the app
+# directory that needs it; `.dev.vars` is gitignored and never committed.
+#
+# By design there are very few: service bindings need no credentials, and
+# Access JWT validation uses public keys (docs/12-deployment.md).
+#
+# Demerzel substitutes a stub identity in dev, so none of these are
+# required to run the stack locally — they exist for testing the real
+# paths against a staging Access application.
+
+# The CI Access service token, as `bun run smoke` would present it.
+# CF_ACCESS_CLIENT_ID=
+# CF_ACCESS_CLIENT_SECRET=

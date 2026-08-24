@@ -18,9 +18,10 @@ progress, auth, and the versioning policy. Storage schemas live in
 ## Conventions
 
 - **JSON only**, UTF-8, timestamps ISO-8601 UTC, camelCase wire fields.
-- **Ids are branded and world-scoped** (`hh_uk_01J8…`, `run_uk_01J9…` —
-  formats in [10-data-model](10-data-model.md)), so a single resource is
-  addressable without a world prefix. Convention: *collections* live under
+- **Ids are branded** and, where they name a row in the replica,
+  world-scoped (`uk:E14001156:hh:00b3c1`, `run_01j9dq3zx8k7…` — the four
+  id families are owned by [10-data-model](10-data-model.md)), so a single
+  resource is addressable without a world prefix. Convention: *collections* live under
   `/worlds/{worldId}/…`; *single resources* are fetched top-level by their
   fully qualified id (`/households/{householdId}/dossier`). Vault documents
   (scenarios, questions, runs, outcomes) are top-level collections whose
@@ -64,11 +65,11 @@ requests work unmodified ([09-terminus](09-terminus.md)).
 ### Representative route: launch a run
 
 ```jsonc
-POST /questions/q_uk_ge-standing/runs
+POST /questions/general-election-today/runs
 {
   "questionVersion": 4,
-  "scenario": { "id": "scn_uk_current-polling", "version": 12 },
-  "population": { "epochId": "ep_uk_01J8QZK3" },   // or { "forkId": … }
+  "scenario": { "slug": "current-polling", "version": 12 },
+  "population": { "epochId": "ep_5f9c2a1d44e0" },  // or { "forkId": … }
   "iterations": 1000,
   "seed": 20260824
 }
@@ -77,16 +78,16 @@ POST /questions/q_uk_ge-standing/runs
 ```jsonc
 202 Accepted
 {
-  "runId": "run_uk_01J9AB2C",
+  "runId": "run_01j9dq3zx8k7abcdefghjkmnpq",
   "status": "queued",
   "tuple": {                       // the reproducibility tuple, resolved
-    "worldId": "uk", "epochOrForkId": "ep_uk_01J8QZK3",
-    "scenarioHash": "sha256:9f2c…", "questionVersion": 4,
+    "worldId": "uk", "epochOrForkId": "ep_5f9c2a1d44e0",
+    "scenarioHash": "sc_9f2c1a4d7b03", "questionVersion": 4,
     "engineVersion": "1.3.0",      // pinned server-side, never client-set
     "seed": 20260824
   },
-  "links": { "self": "/runs/run_uk_01J9AB2C",
-             "progress": "/runs/run_uk_01J9AB2C/progress" }
+  "links": { "self": "/runs/run_01j9dq3zx8k7abcdefghjkmnpq",
+             "progress": "/runs/run_01j9dq3zx8k7abcdefghjkmnpq/progress" }
 }
 ```
 
@@ -97,12 +98,12 @@ reproducibility doubles as dedupe ([08-engine](08-engine.md)).
 ### Representative route: the dossier
 
 ```jsonc
-GET /households/hh_uk_01J8ZKQ4/dossier
+GET /households/uk:E14001279:hh:00b3c1/dossier
 200 OK
 {
-  "householdId": "hh_uk_01J8ZKQ4",
+  "householdId": "uk:E14001279:hh:00b3c1",
   "worldId": "uk",
-  "epochId": "ep_uk_01J8QZK3",
+  "epochId": "ep_5f9c2a1d44e0",
   "seat": { "id": "E14001279", "name": "Wakefield and Rothwell" },
   "location": { "lat": 53.68, "lng": -1.50,
                 "placement": "synthetic-density-weighted" },
@@ -112,9 +113,9 @@ GET /households/hh_uk_01J8ZKQ4/dossier
     { "key": "incomeBand", "value": "20-30k", "layer": "modelled:income@2",
       "provenance": "modelled: tenure + qualification + region" }
   ],
-  "persons": [ { "personId": "pn_uk_01J8ZKR7", "age": 54, "sex": "female",
+  "persons": [ { "personId": "uk:E14001279:p:01a2f0", "age": 54, "sex": "female",
                  "qualification": "level-2", "registered": true } ],
-  "leanings": { "runId": "run_uk_01J97XN0", "asOf": "2026-08-23T06:00:00Z",
+  "leanings": { "runId": "run_01j97xn0k2m4p6q8r0s2t4", "asOf": "2026-08-23T06:00:00Z",
                 "shares": { "lab": 0.41, "con": 0.18, "ref": 0.24 } },
   "questionHistory": [ /* question id + version + distribution */ ],
   "touchedBy": [ /* scenario rules / Mule events that matched */ ]
@@ -153,7 +154,7 @@ stripped — stack traces never leave the boundary.
     "message": "unknown field 'incom' in predicate",
     "details": { "position": { "line": 1, "column": 27 },
                  "suggestion": "income" },
-    "requestId": "req_01J9AB7F"
+    "requestId": "req_01j9ab7fc3d5e7g9h1j3k5"
   }
 }
 ```
@@ -182,26 +183,41 @@ Nothing behind Demerzel has a public URL. Services expose typed
 `WorkerEntrypoint` classes consumed over service bindings — a JavaScript
 method call across isolates, not HTTP:
 
+Each service's RPC surface is declared once as an interface in
+`@seldon/foundation` and implemented by its entrypoint, so callers depend
+on the contract rather than on another app's source — the services call
+each other in a cycle, which cross-app imports cannot express
+([D13](14-decisions.md)):
+
+```ts
+// packages/foundation/src/rpc.ts
+export interface RadiantRpc extends HealthRpc {
+  getDossier(id: HouseholdId): Promise<Dossier>;
+  explore(w: WorldId, req: ExploreRequest): Promise<ExploreResult>;
+  listEpochs(w: WorldId): Promise<EpochSummary[]>;
+}
+```
+
 ```ts
 // apps/radiant/src/entrypoint.ts
 import { WorkerEntrypoint } from "cloudflare:workers";
-import type { Dossier, EpochSummary, ExploreRequest, ExploreResult,
-              HouseholdId, WorldId } from "@seldon/foundation";
+import type { RadiantRpc } from "@seldon/foundation";
 
-export class RadiantEntrypoint extends WorkerEntrypoint<RadiantEnv> {
+export class RadiantEntrypoint
+  extends WorkerEntrypoint<RadiantEnv>
+  implements RadiantRpc
+{
   async getDossier(id: HouseholdId): Promise<Dossier> { /* shard DO */ }
-  async explore(w: WorldId, req: ExploreRequest): Promise<ExploreResult> {}
-  async listEpochs(w: WorldId): Promise<EpochSummary[]> { /* D1 */ }
+  // …
 }
 ```
 
 ```ts
 // apps/demerzel — wrangler.jsonc binds
-//   { "binding": "RADIANT", "service": "radiant",
+//   { "binding": "RADIANT", "service": "seldon-radiant-staging",
 //     "entrypoint": "RadiantEntrypoint" }
 interface DemerzelEnv {
-  RADIANT: Service<
-    import("../../radiant/src/entrypoint").RadiantEntrypoint>;
+  RADIANT: RadiantRpc;
 }
 const dossier = await env.RADIANT.getDossier(householdId);
 ```
@@ -227,12 +243,12 @@ server messages are a discriminated union on `type`, each with a
 monotonic `seq`:
 
 ```jsonc
-{ "type": "hello", "runId": "run_uk_01J9AB2C", "seq": 0,
+{ "type": "hello", "runId": "run_01j9dq3zx8k7abcdefghjkmnpq", "seq": 0,
   "status": "running", "iterations": 1000, "seatsTotal": 650 }
 { "type": "progress", "seq": 41, "seatsDone": 312,
   "headline": { "shares": { "lab": 0.34, "ref": 0.27 },
                 "band": 0.012 } }        // convergence half-width
-{ "type": "complete", "seq": 97, "outcomeId": "out_uk_01J9AC5D" }
+{ "type": "complete", "seq": 97, "outcomeId": "out_01j9ac5dv6w8x0y2z4a6b8" }
 { "type": "failed", "seq": 55,
   "error": { "code": "unprocessable", "message": "…" } }
 ```

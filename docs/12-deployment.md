@@ -123,8 +123,8 @@ routes; Second Foundation adds `triggers.crons`.
   // WorldRegistry: one object per world.
   "durable_objects": {
     "bindings": [
-      { "name": "SEAT_SHARD", "class_name": "SeatShard" },
-      { "name": "WORLD_REGISTRY", "class_name": "WorldRegistry" }
+      { "name": "SHARD_DO", "class_name": "SeatShard" },
+      { "name": "WORLD_REGISTRY_DO", "class_name": "WorldRegistry" }
     ]
   },
   // DO migrations: append-only deploy events (§ Migration discipline).
@@ -148,8 +148,11 @@ routes; Second Foundation adds `triggers.crons`.
     { "binding": "EPOCH_BUCKET", "bucket_name": "seldon-epochs-dev" }
   ],
 
-  // ── Hot caches: tile manifests, aggregate summaries ──────────────
-  "kv_namespaces": [{ "binding": "RADIANT_CACHE_KV", "id": "local" }],
+  // ── Hot caches: seat rollups and tile manifests ──────────────────
+  "kv_namespaces": [
+    { "binding": "AGG_KV", "id": "local" },
+    { "binding": "TILES_KV", "id": "local" }
+  ],
 
   // ── Synthesis fan-out: Radiant enqueues and consumes seat tasks ──
   "queues": {
@@ -169,7 +172,7 @@ routes; Second Foundation adds `triggers.crons`.
   // ── Durable orchestration: derive → IPF → validate → publish ─────
   "workflows": [
     {
-      "binding": "SYNTHESIS_WORKFLOW",
+      "binding": "SYNTH_WF",
       "name": "seldon-synthesis-dev",
       "class_name": "SynthesisWorkflow"
     }
@@ -316,9 +319,9 @@ jobs:
       - run: bun install --frozen-lockfile
       - run: bun run infra:up --stack staging     # pulumi up, idempotent
       - run: bun run migrate --env staging        # D1, before any Worker
-      # Leaves deploy first so service bindings always resolve:
-      # radiant, vault, encyclopedia, psychohistory, second-foundation,
-      # then demerzel, then terminus. Turborepo's graph encodes it.
+      # Leaves deploy first, gateway after what it routes to, console
+      # last: radiant, encyclopedia, vault, psychohistory,
+      # second-foundation, demerzel, terminus.
       - run: bun run deploy --env staging
       - run: bun run smoke --env staging          # health walk (below)
 
@@ -331,6 +334,15 @@ jobs:
       - run: bun run deploy --env production --gradual   # § Rollout
       - run: bun run smoke --env production
 ```
+
+The order is deliberate but cannot be a topological sort: the domain graph
+has one genuine cycle — Radiant reads a dossier's leanings from Vault,
+Vault records a run into Psychohistory, Psychohistory reads cells back
+from Radiant. On a first-ever deploy into an empty environment one of
+those bindings therefore points at a Worker that does not exist yet, so
+`bun run deploy` retries any failure once after the first full pass and
+fails only on what survives the retry. Steady-state deploys never need the
+second pass.
 
 Releases are cut from a `main` commit that staging has already been running
 — production never receives a SHA staging has not soaked. The smoke script

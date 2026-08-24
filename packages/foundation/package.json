@@ -1,0 +1,22 @@
+{
+  "name": "@seldon/foundation",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./ids": "./src/ids.ts",
+    "./errors": "./src/errors.ts",
+    "./resources": "./src/resources.ts",
+    "./services": "./src/services.ts"
+  },
+  "types": "./src/index.ts",
+  "scripts": {
+    "typecheck": "tsc --build",
+    "lint": "biome check src test",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "zod": "^4.1.12"
+  }
+}

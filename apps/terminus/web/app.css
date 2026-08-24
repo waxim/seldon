@@ -1,0 +1,207 @@
+/* Terminus shell styling. Tokens come from @seldon/ui. */
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--void);
+  color: var(--ink);
+  font-family: var(--font-ui);
+  font-size: var(--text-md);
+  line-height: 1.5;
+}
+
+code {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--ink-muted);
+}
+
+.seldon-shell {
+  display: grid;
+  grid-template-columns: 232px 1fr;
+  min-height: 100vh;
+}
+
+.seldon-nav {
+  border-right: 1px solid var(--hairline);
+  padding: var(--space-5) var(--space-4);
+  background: var(--surface);
+}
+
+.seldon-nav ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.seldon-nav a {
+  display: block;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius);
+  color: var(--ink-muted);
+  text-decoration: none;
+  font-size: var(--text-sm);
+  transition: color var(--motion-fast) var(--easing);
+}
+
+.seldon-nav a:hover {
+  color: var(--ink);
+}
+
+.seldon-nav a[aria-current="page"] {
+  color: var(--ink);
+  background: var(--surface-raised);
+  box-shadow: inset 2px 0 0 var(--radiant);
+}
+
+.seldon-nav a:focus-visible {
+  outline: 2px solid var(--radiant);
+  outline-offset: 2px;
+}
+
+.seldon-world {
+  margin-bottom: var(--space-5);
+  display: flex;
+  flex-direction: column;
+}
+
+.seldon-world-label {
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--ink-muted);
+}
+
+.seldon-world-name {
+  font-size: var(--text-lg);
+  color: var(--radiant);
+}
+
+.seldon-main {
+  padding: var(--space-6);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.seldon-panel {
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.seldon-panel header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--space-4);
+  padding: var(--space-4) var(--space-5);
+  border-bottom: 1px solid var(--hairline);
+}
+
+.seldon-panel h2 {
+  margin: 0;
+  font-size: var(--text-lg);
+  font-weight: 600;
+}
+
+.seldon-panel-sub {
+  margin: var(--space-1) 0 0;
+  color: var(--ink-muted);
+  font-size: var(--text-sm);
+}
+
+.seldon-panel-body {
+  padding: var(--space-5);
+}
+
+.seldon-empty,
+.seldon-error {
+  margin: 0;
+  color: var(--ink-muted);
+  font-size: var(--text-sm);
+  max-width: 68ch;
+}
+
+.seldon-error {
+  color: var(--negative);
+}
+
+.seldon-checks {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.seldon-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid var(--hairline);
+  border-radius: 999px;
+  font-size: var(--text-xs);
+}
+
+.seldon-pill-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--ink-muted);
+}
+
+.seldon-pill[data-tone="positive"] .seldon-pill-dot {
+  background: var(--positive);
+}
+
+.seldon-pill[data-tone="negative"] .seldon-pill-dot {
+  background: var(--negative);
+}
+
+.seldon-pill[data-tone="radiant"] .seldon-pill-dot {
+  background: var(--radiant);
+}
+
+.seldon-pill-status {
+  color: var(--ink-muted);
+}
+
+.seldon-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-sm);
+}
+
+.seldon-table th {
+  text-align: left;
+  font-weight: 500;
+  color: var(--ink-muted);
+  border-bottom: 1px solid var(--hairline);
+  padding-bottom: var(--space-2);
+}
+
+.seldon-table td {
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--hairline);
+}
+
+.seldon-provenance {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--hairline);
+  font-size: var(--text-xs);
+  color: var(--ink-muted);
+}
+
+.seldon-provenance-label {
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-right: var(--space-2);
+}

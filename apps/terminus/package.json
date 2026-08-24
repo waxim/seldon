@@ -1,0 +1,28 @@
+{
+  "name": "@seldon/terminus",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --build tsconfig.json tsconfig.web.json",
+    "lint": "biome check src web test",
+    "test": "vitest run",
+    "build": "vite build",
+    "dev": "wrangler dev",
+    "dev:web": "vite dev",
+    "deploy": "wrangler deploy"
+  },
+  "dependencies": {
+    "@seldon/client": "workspace:*",
+    "@seldon/foundation": "workspace:*",
+    "@seldon/ui": "workspace:*",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.2",
+    "@types/react-dom": "^19.2.1",
+    "@vitejs/plugin-react": "^5.0.4",
+    "vite": "^7.1.9"
+  }
+}
