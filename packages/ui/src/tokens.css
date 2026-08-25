@@ -3,15 +3,23 @@
  *
  * Dark by default: deep space, not grey, with one warm radiant accent.
  * The token names are the contract; these values are the reference set.
+ * The nine tokens named in the doc's table keep the doc's values exactly;
+ * the rest fill in the shades a real interface needs between them.
  */
 :root {
+  color-scheme: dark;
+
   --void: #0a0e1a;
   --surface: #111726;
   --surface-raised: #18203a;
+  --surface-sunken: #0d1220;
   --ink: #e9ecf5;
   --ink-muted: #9aa3b8;
+  --ink-faint: #7b8399;
   --radiant: #e3b34c;
+  --radiant-soft: #6b5629;
   --hairline: #232c45;
+  --hairline-strong: #33406a;
   --positive: #4cc38a;
   --negative: #e5484d;
 
@@ -25,6 +33,9 @@
   --text-xl: 28px;
   --text-display: 40px;
 
+  --leading-prose: 1.5;
+  --leading-display: 1.15;
+
   --motion-fast: 120ms;
   --motion-panel: 200ms;
   --motion-camera: 320ms;
@@ -36,20 +47,43 @@
   --space-4: 16px;
   --space-5: 24px;
   --space-6: 32px;
+  --space-7: 48px;
+  --space-8: 64px;
 
+  --radius-sm: 4px;
   --radius: 6px;
+  --radius-lg: 10px;
+  --radius-pill: 999px;
+
+  --shadow-raised: 0 1px 2px rgb(0 0 0 / 0.4), 0 8px 24px rgb(0 0 0 / 0.28);
+  --shadow-overlay: 0 24px 64px rgb(0 0 0 / 0.55);
+
+  /* The Prime Radiant motif: never above 4% opacity, never behind data. */
+  --motif-opacity: 0.035;
 }
 
 :root[data-theme="light"] {
+  color-scheme: light;
+
   --void: #f7f6f2;
   --surface: #ffffff;
   --surface-raised: #ffffff;
+  --surface-sunken: #efede6;
   --ink: #171b26;
   --ink-muted: #5a6172;
+  --ink-faint: #656b7a;
   --radiant: #b78a2e;
+  --radiant-soft: #f0e2bd;
   --hairline: #e3e1da;
+  --hairline-strong: #cbc8bd;
   --positive: #2f8f63;
   --negative: #c2373b;
+
+  --shadow-raised:
+    0 1px 2px rgb(23 27 38 / 0.06), 0 8px 24px rgb(23 27 38 / 0.06);
+  --shadow-overlay: 0 24px 64px rgb(23 27 38 / 0.18);
+
+  --motif-opacity: 0.045;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -58,9 +92,4 @@
     --motion-panel: 1ms;
     --motion-camera: 1ms;
   }
-}
-
-/* Numbers never shimmy: every numeric surface is tabular. */
-.seldon-numeric {
-  font-variant-numeric: tabular-nums;
 }

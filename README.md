@@ -30,9 +30,15 @@ The design in [`docs/`](docs/) is complete and remains the contract. The
 monorepo now exists alongside it: seven Worker apps, six shared packages,
 the Pulumi infrastructure project and the full CI/CD pipeline are
 scaffolded and green. **No domain logic is built yet** — the apps answer
-health, prove their bindings and hold their schemas; every screen in the
-console says which phase fills it. What P0 delivers, and what still gates
-P1, is tracked in [`docs/p0-acceptance.md`](docs/p0-acceptance.md).
+health, prove their bindings and hold their schemas.
+
+Terminus, though, is designed out end to end: every section of the
+information architecture is a routed screen wearing its real chrome — the
+columns a table will have, the chamber a hemicycle will fill — and an
+empty state that names the phase which fills it. Nothing invents a number
+to cover the gap, and each phase fills its own screens as it lands. What
+P0 delivers, and what still gates P1, is tracked in
+[`docs/p0-acceptance.md`](docs/p0-acceptance.md).
 
 Two earlier attempts inform this design and are kept as history:
 [`LEGACY.md`](LEGACY.md) (v1 — a CLI + services build) and [`v2/`](v2/)
