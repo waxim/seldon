@@ -23,6 +23,8 @@ account**, and P1 does not start until those are ticked too.
 | `infra:check` in CI | done | `.github/workflows/ci.yml` job `verify` |
 | Demerzel + Access: JWT validation, identity → role, audit log | done | `apps/demerzel/test/access.test.ts` |
 | Terminus shell: navigation, `@seldon/client` calling Demerzel | done | `apps/terminus/test/terminus.test.ts` |
+| Terminus console: every section and sub-screen, routed and designed, with empty states that name their phase | done | `apps/terminus/web/router.test.tsx` walks every route |
+| `@seldon/ui`: Foundation-modern tokens, components and hand-rolled SVG charts | done | `packages/ui/test/` — including the WCAG contrast bar |
 | CI/CD pipelines including PR preview deploys | written | `.github/workflows/` — unverified until the first pull request runs |
 
 ## Accept
@@ -51,7 +53,7 @@ account**, and P1 does not start until those are ticked too.
 
 ## Honest gaps
 
-Three things a reader should not have to infer:
+Four things a reader should not have to infer:
 
 1. **The DSL is half a package.** The typed field registry exists — which
    is the half P0 called for by name, because it is what makes a misspelt
@@ -70,6 +72,16 @@ Three things a reader should not have to infer:
    bindings resolve, migrate their schemas and route a request end to
    end. No population, no ingestion, no engine. The console says as much
    on every screen rather than showing invented numbers.
+4. **Terminus is designed, not filled.** Every section of the
+   information architecture in [09-terminus](09-terminus.md) exists as a
+   routed screen with its real chrome — the columns a table will have,
+   the chamber a hemicycle will fill, the five stages an ingest run
+   walks — and an empty state naming the phase that fills it. Three
+   surfaces are genuinely live: the ⌘K palette, the DSL filter bar
+   (typed autocomplete and field lint over the committed registry), and
+   the walking-skeleton health call. **MapLibre GL is not installed
+   yet**: `MapFrame` holds the zoom ladder and the privacy caption, and
+   the map mounts inside it in P2 when there are PMTiles to point it at.
 
 Related: [13-roadmap](13-roadmap.md) · [12-deployment](12-deployment.md) ·
 [03-architecture](03-architecture.md) · [14-decisions](14-decisions.md)

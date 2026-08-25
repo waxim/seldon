@@ -11,6 +11,9 @@
   "references": [
     { "path": "../../packages/foundation" },
     { "path": "../../packages/client" },
+    { "path": "../../packages/dsl" },
+    { "path": "../../packages/geo" },
+    { "path": "../../packages/parties" },
     { "path": "../../packages/ui" }
   ]
 }

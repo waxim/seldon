@@ -1,0 +1,166 @@
+/*
+ * The Tailwind half of the design language.
+ *
+ * `tokens.css` declares the tokens; this file teaches Tailwind to spend
+ * them, so `bg-surface text-ink-muted` resolves to the custom properties
+ * rather than to copied hex — which is what makes the light theme a
+ * `data-theme` flip and not a rebuild.
+ *
+ * Import this once, at the app root. It pulls in Tailwind and the tokens,
+ * and declares `@seldon/ui`'s own source files so the design system's
+ * classes survive the content scan of whichever app consumes it.
+ */
+@import "tailwindcss";
+@import "./tokens.css";
+
+@source "./";
+
+@theme inline {
+  /*
+   * The default Tailwind palette is dropped on purpose. Party colours are
+   * the only saturated hues allowed on a data surface (docs/09-terminus.md)
+   * and they come from `@seldon/parties`, so a stray `text-red-500` should
+   * not compile.
+   */
+  --color-*: initial;
+  --color-transparent: transparent;
+  --color-current: currentColor;
+  --color-inherit: inherit;
+  --color-white: #ffffff;
+  --color-black: #000000;
+
+  --color-void: var(--void);
+  --color-surface: var(--surface);
+  --color-surface-raised: var(--surface-raised);
+  --color-surface-sunken: var(--surface-sunken);
+  --color-ink: var(--ink);
+  --color-ink-muted: var(--ink-muted);
+  --color-ink-faint: var(--ink-faint);
+  --color-radiant: var(--radiant);
+  --color-radiant-soft: var(--radiant-soft);
+  --color-hairline: var(--hairline);
+  --color-hairline-strong: var(--hairline-strong);
+  --color-positive: var(--positive);
+  --color-negative: var(--negative);
+
+  --font-sans: var(--font-ui);
+
+  --shadow-raised: var(--shadow-raised);
+  --shadow-overlay: var(--shadow-overlay);
+
+  --ease-out-seldon: var(--easing);
+}
+
+@theme {
+  /* The scale from the doc — 13/14/16/20/28/40 — with its two line heights. */
+  --text-xs: 13px;
+  --text-xs--line-height: 1.5;
+  --text-sm: 14px;
+  --text-sm--line-height: 1.5;
+  --text-base: 16px;
+  --text-base--line-height: 1.5;
+  --text-lg: 20px;
+  --text-lg--line-height: 1.35;
+  --text-xl: 28px;
+  --text-xl--line-height: 1.15;
+  --text-2xl: 40px;
+  --text-2xl--line-height: 1.15;
+  --text-3xl: initial;
+  --text-4xl: initial;
+  --text-5xl: initial;
+  --text-6xl: initial;
+  --text-7xl: initial;
+  --text-8xl: initial;
+  --text-9xl: initial;
+}
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    margin: 0;
+    background: var(--void);
+    color: var(--ink);
+    font-family: var(--font-ui);
+    font-size: var(--text-md);
+    line-height: var(--leading-prose);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  /* One focus treatment, everywhere, in the one warm accent. */
+  :focus-visible {
+    outline: 2px solid var(--radiant);
+    outline-offset: 2px;
+    border-radius: var(--radius-sm);
+  }
+
+  ::selection {
+    background: var(--radiant);
+    color: var(--void);
+  }
+
+  code,
+  kbd,
+  samp {
+    font-family: var(--font-mono);
+    font-size: 0.92em;
+  }
+
+  /* Every numeric surface is tabular, so live numbers do not shimmy. */
+  table,
+  [data-numeric] {
+    font-variant-numeric: tabular-nums;
+  }
+
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--hairline-strong);
+    border-radius: var(--radius-pill);
+    border: 2px solid var(--void);
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+}
+
+@utility skip-link {
+  position: absolute;
+  left: var(--space-4);
+  top: var(--space-4);
+  z-index: 100;
+  transform: translateY(-200%);
+  transition: transform var(--motion-fast) var(--easing);
+
+  &:focus-visible {
+    transform: translateY(0);
+  }
+}
+
+/* Motion: three durations, all ease-out, nothing bounces. */
+@keyframes seldon-slide-in {
+  from {
+    transform: translateX(1.5rem);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes seldon-rise {
+  from {
+    transform: translateY(0.5rem) scale(0.99);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+  }
+}
